@@ -1022,7 +1022,7 @@ function endGame(mode,title,sub){
  const rescued=savedN();if(GEAR.armor>=0){GEAR.armor=Math.max(0,Math.round(player.armor));saveGear();}
  const t=Math.floor(playTime),mm=String(Math.floor(t/60)).padStart(2,'0'),ss=String(t%60).padStart(2,'0');
  const pay=payout(mode==='won');
- if(mode==='won'&&BD.cur){BD.list=BD.list.filter(m=>m.id!==BD.cur.id);if(BD.sel===BD.cur.id)BD.sel=null;}
+ if(mode==='won'&&BD.cur){BD.list=BD.list.filter(m=>m.id!==BD.cur.id);if(BD.sel===BD.cur.id)BD.sel=BD.list.length?BD.list[0].id:null;}
  $('endStats').innerHTML=sub+'<br>Difficulty: '+DF.name+'<br>Hostages freed: '+rescued+' / '+hostages.length+'<br>Suspects down: '+killed+' / '+enemies.length+'<br>Time: '+mm+':'+ss+(pay?'<br><br>Client: '+pay.client+'<br>'+(mode==='won'?'Contract: '+money(pay.base)+'<br>':'Contract failed — half bonus only<br>')+'Suspects ('+pay.nk+'): '+money(pay.kills)+'<br>Hostages saved ('+pay.ns+'): '+money(pay.saved)+'<br><b style="color:var(--green)">Earned: '+money(pay.total)+'</b> · Bank: '+money(CASH):'')+(GEAR.armor===0?'<br><span style="color:var(--red)">Armor broken — repair it in the Armory.</span>':'');
 }
 function startGame(){audio();reset();state='play';$('hud').hidden=false;$('screen').hidden=true;$('hint').hidden=false;$('hint').style.opacity=1;setTimeout(()=>{$('hint').style.opacity=0;},9000);
@@ -1461,9 +1461,7 @@ function pinSVG(m){
 function drawBoard(){
  if(!BD.built){$('mapSvg').innerHTML=boardMapSVG();BD.built=true;}
  $('pins').innerHTML=BD.list.map(pinSVG).join('');
- $('pins').querySelectorAll('.pin').forEach(el=>{const id=+el.dataset.id;el.addEventListener('click',()=>selectMission(id));el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectMission(id);}});});
  $('mList').innerHTML=BD.list.slice().sort((a,b)=>b.diff-a.diff).map(m=>'<button type="button" class="mrow'+(BD.sel===m.id?' on':'')+'" data-id="'+m.id+'"><i style="background:'+DCOL[m.diff]+'"></i><span><b>'+SPOTS[m.spot][0]+'</b><em>'+BASEM[m.type].name+' · '+DIFFS[m.diff].name+' · '+CLIENTS[m.client].n+'</em></span></button>').join('')||'<p class="dim">Waiting for dispatch…</p>';
- $('mList').querySelectorAll('.mrow').forEach(b=>b.addEventListener('click',()=>selectMission(+b.dataset.id)));
  $('mCount').textContent=BD.list.length+' open';$('mCash').textContent=money(CASH);
  const m=BD.list.find(x=>x.id===BD.sel);
  $('mCard').hidden=!m;
@@ -1474,6 +1472,8 @@ function drawBoard(){
   $('mStats').innerHTML='<div><span>Suspects</span><b>'+en+'</b></div><div><span>Hostages</span><b>'+b.ho+'</b></div><div><span>Time</span><b>'+mmss(Math.round(b.t*D.time))+'</b></div><div><span>Enemy dmg</span><b>×'+D.dmg+'</b></div><div><span>Client</span><b style="font-size:14px">'+CLIENTS[m.client].n+'</b></div><div><span>Pay</span><b style="color:var(--green)">'+money(payFor(m,0,0,true).base)+'+</b></div>';
  }
 }
+let boardWired=false;
+function wireBoard(){if(boardWired)return;boardWired=true;const pick=e=>{const t=e.target&&e.target.closest?e.target.closest('.pin,.mrow'):null;if(t&&t.dataset.id)selectMission(+t.dataset.id);};$('mapSvg').addEventListener('pointerdown',pick);$('mList').addEventListener('pointerdown',pick);}
 function selectMission(id){BD.sel=id;delete BD.fresh[id];drawBoard();}
 function addMission(){
  const used=new Set(BD.list.map(m=>m.spot)),free=SPOTS.map((_,i)=>i).filter(i=>!used.has(i));
@@ -1489,6 +1489,7 @@ function addMission(){
 function showBoard(){
  state='board';BD.open=true;BD.t=BD.list.length?5:.3;
  ['screen','intro','hud'].forEach(i=>$(i).hidden=true);$('touch').style.display='none';fogC.style.display='none';
+ wireBoard();if(BD.sel==null||!BD.list.some(m=>m.id===BD.sel))BD.sel=BD.list.length?BD.list[0].id:null;
  $('board').hidden=false;drawBoard();
 }
 function updateBoard(dt){
@@ -1497,7 +1498,7 @@ function updateBoard(dt){
 }
 function startMission(){
  const m=BD.list.find(x=>x.id===BD.sel);if(!m)return;
- BD.cur=m;curLevel=m.type;$('board').hidden=true;BD.open=false;fogC.style.display='block';
+ EN.on=false;$('endBox').hidden=true;BD.cur=m;curLevel=m.type;$('board').hidden=true;BD.open=false;fogC.style.display='block';
  loadLevel(m.type,m.diff);startGame();
 }
 
@@ -1523,7 +1524,7 @@ function fbiSetup(){
  enSub('FBI hostage rescue team breaching…');
  for(let i=0;i<N;i++){
   const m=makePerson({shirt:0x141c2e,vest:0x05070c,pants:0x0b0f18,skin:0xc9a07a,hat:'cap',armed:true,gun:'smg'});
-  const a={x:sp.x+(i%3-1)*.5,z:sp.z+(((i/3)|0)-.5)*.5,h:sp.h,r:.28,mesh:m,path:null,pt:0,target:null,q:[],tg:null,anim:0,st:0,shots:0,done:false};
+  const a={x:sp.x+(i%3-1)*.55,z:sp.z+(((i/3)|0)-.5)*.55,h:sp.h,r:.28,mesh:m,path:null,pt:0,target:null,q:[],tg:null,anim:0,st:0,shots:0,done:false,delay:i*.55,spd:5.4+Math.random()*1.4,sup:Math.random()};
   setPose(a);EN.agents.push(a);}
  const list=[];
  for(const e of alive){const p=bfs(Math.floor(sp.x),Math.floor(sp.z),Math.floor(e.x),Math.floor(e.z));if(p.length)list.push({e,d:p.length});else EN.sched.push({e,t:2+Math.random()*8});}
@@ -1547,12 +1548,15 @@ function updateEnding(dt){
   if(EN.ph===0){
    let cx=0,cz=0;
    for(const a of EN.agents){
-    if(!a.tg||a.tg.state==='dead'){a.tg=a.q.shift()||null;a.path=null;a.pt=0;a.st=0;a.shots=0;}
+    if(a.delay>0){a.delay-=dt;setPose(a);cx+=a.x;cz+=a.z;continue;}
+    if(!a.tg||a.tg.state==='dead'){a.tg=a.q.shift()||null;
+     if(!a.tg){let bd=1e9;for(const e of enemies){if(e.state==='dead'||EN.sched.some(s=>s.e===e)||EN.agents.some(o=>o.tg===e))continue;const dd=Math.hypot(e.x-a.x,e.z-a.z);if(dd<bd){bd=dd;a.tg=e;}}}
+     a.path=null;a.pt=0;a.st=0;a.shots=0;}
     let v=0;
     if(a.tg){const e=a.tg,dx=e.x-a.x,dz=e.z-a.z,d=Math.hypot(dx,dz);
      if(d<6.5&&los(a.x,a.z,e.x,e.z)){a.h=turnToward(a.h,Math.atan2(dz,dx),dt*12);a.st+=dt;
       if(a.st>.28){a.st=0;a.shots++;const mz=a.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},50);noise(.07,.2,3000);spark(e.x,e.z,1+Math.random()*.4);if(a.shots>=3)enKill(e);}}
-     else{a.target={x:e.x,z:e.z};v=followPath(a,dt,6.2);}}
+     else{a.target={x:e.x,z:e.z};v=followPath(a,dt,a.spd);a.sup-=dt;if(v>0&&a.sup<=0){a.sup=.3+Math.random()*.6;const mz=a.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},50);noise(.05,.14,3000);}}}
     legs(a,v,dt);setPose(a);cx+=a.x;cz+=a.z;}
    for(const s of EN.sched){s.t-=dt;if(s.t<=0&&s.e.state!=='dead'){const mm=s.e;noise(.12,.25,2600);setTimeout(()=>noise(.08,.2,2800),90);enKill(mm);}}
    EN.focus={x:cx/EN.agents.length,z:cz/EN.agents.length};
@@ -1564,7 +1568,7 @@ function updateEnding(dt){
    let cx=0,cz=0,n=0;
    for(const a of EN.agents){
     if(a.done)continue;
-    const v=followPath(a,dt,5.2);legs(a,v,dt);setPose(a);
+    const v=followPath(a,dt,a.spd*.9);legs(a,v,dt);setPose(a);
     if(Math.hypot(a.x-sp.x,a.z-sp.z)<1.4||EN.phT>7){a.done=true;a.mesh.visible=false;continue;}
     cx+=a.x;cz+=a.z;n++;}
    if(n)EN.focus={x:cx/n,z:cz/n};
@@ -1590,9 +1594,13 @@ function finishEnding(){
 }
 
 /* ---------- armory: weapons, attachments, armor ---------- */
-let GEAR={own:{},equip:'pistol',armor:-1};
-const ARMOR_MAX=50,ARMOR_PRICE=3000,REPAIR_PER=40;
-try{const s=JSON.parse(localStorage.getItem('hotEntryGear'));if(s&&typeof s==='object')GEAR={own:s.own||{},equip:s.equip||'pistol',armor:typeof s.armor==='number'?s.armor:-1};}catch(e){}
+function ARMORS_OK(t){return t==='medium'||t==='heavy'?t:'light';}
+let GEAR={own:{},equip:'pistol',armor:-1,armorType:'light'};
+const REPAIR_PER=40;
+const ARMORS={light:{name:'Light body armor',max:50,price:3000,slow:1,desc:'Soaks 50 damage. No slowdown.'},medium:{name:'Medium body armor',max:100,price:7500,slow:.965,desc:'Soaks 100 damage. Slows you down a very tiny bit.'},heavy:{name:'Heavy body armor',max:200,price:14000,slow:.86,desc:'Soaks 200 damage. Noticeably slower on your feet.'}};
+function armorMax(){return GEAR.armor<0?0:ARMORS[GEAR.armorType].max;}
+function armorSlow(){return (GEAR.armor>=0&&player.armor>0)?ARMORS[GEAR.armorType].slow:1;}
+try{const s=JSON.parse(localStorage.getItem('hotEntryGear'));if(s&&typeof s==='object')GEAR={own:s.own||{},equip:s.equip||'pistol',armor:typeof s.armor==='number'?s.armor:-1,armorType:ARMORS_OK(s.armorType)};}catch(e){}
 function saveGear(){try{localStorage.setItem('hotEntryGear',JSON.stringify(GEAR));}catch(e){}}
 const WPN={pistol:{name:'Service pistol',dmg:50,cool:.17,mag:15,spread:.03,rel:1.25,gun:'pistol'},smg:{name:'Street sweeper SMG',dmg:34,cool:.085,mag:30,spread:.09,rel:1.7,gun:'smg'}};
 function wpn(){const b=WPN[GEAR.equip]||WPN.pistol,o=GEAR.own;
@@ -1617,7 +1625,7 @@ function updateLaser(){
  if(len<.2){laserM.visible=false;return;}
  laserM.visible=true;laserM.scale.x=len;laserM.position.set(player.x+c*(.9+len/2),1.02,player.z+s*(.9+len/2));laserM.rotation.y=-player.h;
 }
-function armorFixCost(){return GEAR.armor<0?0:Math.round((ARMOR_MAX-GEAR.armor)*REPAIR_PER);}
+function armorFixCost(){return GEAR.armor<0?0:Math.round((armorMax()-GEAR.armor)*REPAIR_PER);}
 function shopRow(title,desc,right){return '<div class="srow"><div class="sinfo"><b>'+title+'</b><span>'+desc+'</span></div>'+right+'</div>';}
 function renderShop(){
  $('sCash').textContent=money(CASH);
@@ -1627,19 +1635,20 @@ function renderShop(){
   h+=shopRow(b.name,d,owned?(on?'<button class="btn ghost sbtn" disabled>Equipped</button>':'<button class="btn sbtn" data-a="equip" data-id="'+id+'">Equip</button>'):'<button class="btn sbtn" data-a="buy" data-id="smg"'+(CASH<SMG_PRICE?' disabled':'')+'>'+money(SMG_PRICE)+'</button>');}
  h+='<h3>Attachments <small>apply to your equipped weapon</small></h3>';
  for(const a of ATTACH)h+=shopRow(a.name,a.desc,GEAR.own[a.id]?'<button class="btn ghost sbtn" disabled>Owned</button>':'<button class="btn sbtn" data-a="buy" data-id="'+a.id+'"'+(CASH<a.price?' disabled':'')+'>'+money(a.price)+'</button>');
- h+='<h3>Armor</h3>';
- if(GEAR.armor<0)h+=shopRow('Light body armor','Soaks '+ARMOR_MAX+' damage before it breaks. Broken plates must be repaired here before they work again.','<button class="btn sbtn" data-a="buy" data-id="armor"'+(CASH<ARMOR_PRICE?' disabled':'')+'>'+money(ARMOR_PRICE)+'</button>');
- else{const c=armorFixCost();h+=shopRow('Light body armor','Plates: '+Math.round(GEAR.armor)+' / '+ARMOR_MAX+(GEAR.armor<=0?' — BROKEN':''),c?'<button class="btn sbtn" data-a="repair"'+(CASH<c?' disabled':'')+'>Repair '+money(c)+'</button>':'<button class="btn ghost sbtn" disabled>Intact</button>');}
+ h+='<h3>Armor <small>one set at a time; buying another replaces it</small></h3>';
+ for(const id of ['light','medium','heavy']){const A=ARMORS[id],mine=GEAR.armor>=0&&GEAR.armorType===id;
+  if(mine){const c=armorFixCost();h+=shopRow(A.name,'Plates: '+Math.round(GEAR.armor)+' / '+A.max+(GEAR.armor<=0?' \u2014 BROKEN':'')+' \u00b7 '+A.desc,c?'<button class="btn sbtn" data-a="repair"'+(CASH<c?' disabled':'')+'>Repair '+money(c)+'</button>':'<button class="btn ghost sbtn" disabled>Intact</button>');}
+  else h+=shopRow(A.name,A.desc,'<button class="btn sbtn" data-a="buy" data-id="armor-'+id+'"'+(CASH<A.price?' disabled':'')+'>'+money(A.price)+'</button>');}
  $('sList').innerHTML=h;
  $('sList').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>shopAct(b.dataset.a,b.dataset.id)));
 }
 function shopMsg(t,col){const e=$('sToast');e.textContent=t;e.style.color=col||'';e.classList.remove('go');void e.offsetWidth;e.classList.add('go');}
 function shopAct(a,id){
  if(a==='equip'){GEAR.equip=id;saveGear();shopMsg(WPN[id].name+' equipped','#5fe28c');}
- else if(a==='repair'){const c=armorFixCost();if(CASH<c)return;CASH-=c;GEAR.armor=ARMOR_MAX;saveCash();saveGear();shopMsg('Armor repaired','#5fe28c');}
- else{let p=0;if(id==='smg')p=SMG_PRICE;else if(id==='armor')p=ARMOR_PRICE;else p=ATTACH.find(x=>x.id===id).price;
+ else if(a==='repair'){const c=armorFixCost();if(CASH<c)return;CASH-=c;GEAR.armor=armorMax();saveCash();saveGear();shopMsg('Armor repaired','#5fe28c');}
+ else{let p=0;if(id==='smg')p=SMG_PRICE;else if(id.indexOf('armor-')===0)p=ARMORS[id.slice(6)].price;else p=ATTACH.find(x=>x.id===id).price;
   if(CASH<p){shopMsg('Not enough cash','#ff4a3c');return;}
-  CASH-=p;if(id==='armor')GEAR.armor=ARMOR_MAX;else GEAR.own[id]=1;saveCash();saveGear();shopMsg('Purchased','#5fe28c');}
+  CASH-=p;if(id.indexOf('armor-')===0){GEAR.armorType=id.slice(6);GEAR.armor=ARMORS[GEAR.armorType].max;}else GEAR.own[id]=1;saveCash();saveGear();shopMsg('Purchased','#5fe28c');}
  renderShop();
 }
 function showShop(){state='shop';$('board').hidden=true;$('shop').hidden=false;renderShop();}
@@ -1822,7 +1831,7 @@ function update(dt){
   if(player.crouch){tvx*=.5;tvz*=.5;}
   if(tk){tvx=0;tvz=0;}
   const k=Math.min(1,dt*10);player.vx=(player.vx||0)+(tvx-(player.vx||0))*k;player.vz=(player.vz||0)+(tvz-(player.vz||0))*k;
-  moveEnt(player,player.vx*dt,player.vz*dt);player.sp=Math.hypot(player.vx,player.vz);
+  {const ak=armorSlow();moveEnt(player,player.vx*dt*ak,player.vz*dt*ak);}player.sp=Math.hypot(player.vx,player.vz);
   if(player.sp>2.2){player.stepT=(player.stepT||0)-dt;if(player.stepT<=0){player.stepT=shift?.28:.5;makeNoise(player.x,player.z,shift?8:2.8);}}
   player.noiseLvl=Math.max(0,(player.noiseLvl||0)-dt*1.2);$('noiseFill').style.width=Math.round(player.noiseLvl*100)+'%';
   legs(player,player.sp,dt);setPose(player);player.mesh.rotation.z=0;player.cr+=((player.crouch?1:0)-player.cr)*Math.min(1,dt*10);player.mesh.scale.y=1-.24*player.cr;
@@ -1839,7 +1848,7 @@ function update(dt){
   updateBullets(dt);
   if(state==='play'&&!tk){const nH=hostages.length,fr=hostages.filter(h=>h.free).length,al=enemies.filter(e=>e.state!=='dead').length;if(enemies.length&&al===0)startEnding('clear');else if(nH&&fr===nH)startEnding('fbi');}
   hpFill.style.width=player.hp+'%';hpFill.style.background=player.hp>50?'var(--green)':player.hp>25?'var(--amber)':'var(--red)';hpNum.textContent=Math.ceil(player.hp);
-  {const ac=$('armChip');ac.hidden=GEAR.armor<0;if(GEAR.armor>=0){$('armFill').style.width=Math.max(0,player.armor/ARMOR_MAX*100)+'%';$('armNum').textContent=Math.ceil(player.armor);}}
+  {const ac=$('armChip');ac.hidden=GEAR.armor<0;if(GEAR.armor>=0){$('armFill').style.width=Math.max(0,player.armor/armorMax()*100)+'%';$('armNum').textContent=Math.ceil(player.armor);}}
   $('ammo').textContent=player.ammo+' / '+player.mag;$('reloadTag').textContent=player.reload>0?'reloading':'';
   $('hostages').textContent=hostages.filter(h=>h.free).length+' / '+hostages.length;
   $('hostiles').textContent=enemies.filter(e=>e.state!=='dead').length;
