@@ -70,6 +70,19 @@ body{background:var(--ink);color:var(--fg);font-family:var(--mono);overflow:hidd
 #mToast{position:absolute;left:50%;top:14px;transform:translate(-50%,-30px);opacity:0;background:rgba(8,11,18,.92);border:1px solid var(--line);border-left-width:5px;padding:8px 14px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
 #mToast.go{animation:tin 3.4s ease forwards}@keyframes tin{0%{opacity:0;transform:translate(-50%,-30px)}10%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-10px)}}
 @media (max-aspect-ratio:1/1),(max-width:720px){#board{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}#mapHost{order:-1}#side{border-right:0;border-top:1px solid var(--line);max-height:50vh;padding:12px 14px}#side h2{font-size:30px}#mList{display:none}}
+.chip[hidden]{display:none}
+#shop{position:fixed;inset:0;z-index:13;background:#0d121b;overflow:auto;padding:max(18px,env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
+#shop[hidden]{display:none}
+.sbox{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.sbox .hd{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sbox h2{margin:0;font-family:var(--display);font-weight:900;font-size:48px;letter-spacing:.04em;text-transform:uppercase;line-height:1}
+#sCashRow{font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}#sCash{color:var(--green);font-size:22px;margin-left:6px}
+#sList h3{margin:14px 0 6px;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+#sList h3 small{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--dim);font-weight:400;margin-left:8px}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);padding:10px 12px;border-radius:3px;margin-bottom:6px}
+.sinfo{display:flex;flex-direction:column;gap:3px;min-width:0}.sinfo b{font-size:14px;font-weight:600}.sinfo span{font-size:11px;color:var(--dim);line-height:1.4}
+.sbtn{font-size:16px!important;padding:8px 14px!important;white-space:nowrap;flex:none}.sbtn:disabled{opacity:.45;cursor:not-allowed}
+#sToast{min-height:18px;font-size:12px;letter-spacing:.12em;text-transform:uppercase}#sToast.go{animation:sfade 2.4s ease forwards}@keyframes sfade{0%{opacity:0}10%,80%{opacity:1}100%{opacity:0}}
 #intro{position:fixed;inset:0;z-index:20;pointer-events:none}
 #intro .bar{position:absolute;left:0;right:0;height:0;background:#000;transition:height 1.2s}
 #intro .bar.t{top:0}#intro .bar.b{bottom:0}#intro.bars .bar{height:11vh}
@@ -130,6 +143,7 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
 <div id="hud" hidden>
   <button id="tdBtn" type="button">Stealth takedown<span>E</span></button>
   <div class="col">
+    <div class="chip" id="armChip" hidden><span class="lbl">Armor</span><div class="bar"><i id="armFill" style="background:var(--blue)"></i></div><b id="armNum">50</b></div>
     <div class="chip"><span class="lbl">Health</span><div class="bar"><i id="hpFill"></i></div><b id="hpNum">100</b></div>
     <div class="chip"><span class="lbl">Noise</span><div class="bar"><i id="noiseFill" style="width:0;background:var(--amber)"></i></div></div>
     <div class="chip"><span class="lbl">Stance</span><b id="stance">Stand</b></div>
@@ -170,9 +184,17 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
       <span id="mBadge"></span><div id="mPips"></div><div id="mStats"></div>
       <div class="row"><button class="btn" id="goBtn" type="button">Start entry</button></div>
     </div>
-    <div class="row"><button class="btn ghost" id="bkBtn" type="button">Back</button><button class="btn ghost" id="bSetBtn" type="button">Settings</button></div>
+    <div class="row"><button class="btn ghost" id="shopBtn" type="button">Armory</button><button class="btn ghost" id="bkBtn" type="button">Back</button><button class="btn ghost" id="bSetBtn" type="button">Settings</button></div>
   </div>
   <div id="mapHost"><div id="mapSvg"></div><div id="mToast"></div></div>
+</div>
+<div id="shop" hidden>
+  <div class="sbox">
+    <div class="hd"><h2>Armory</h2><span id="sCashRow">Bank <b id="sCash">$0</b></span></div>
+    <div id="sList"></div>
+    <div id="sToast"></div>
+    <div class="row"><button class="btn" id="shopBack" type="button">Back to contracts</button></div>
+  </div>
 </div>
 <div id="intro" hidden><div class="bar t"></div><div class="bar b"></div><div id="introSub"></div><button id="skipBtn" type="button">Skip ▸</button></div>
 <div id="screen" class="lobby">
@@ -819,16 +841,18 @@ function bodyCheck(e){
   if(d<8&&Math.abs(angDiff(Math.atan2(dz,dx),e.h))<1.1&&los(e.x,e.z,b.x,b.z)){b.found=true;goSus(e,b.x,b.z);return;}}
 }
 function onDeath(e){for(const o of enemies){if(o===e||o.state==='dead'||o.state==='alert')continue;const d=Math.hypot(o.x-e.x,o.z-e.z);if(d<9&&los(o.x,o.z,e.x,e.z))goSus(o,e.x,e.z);}}
-function damagePlayer(n){player.hp=Math.max(0,player.hp-n);shake=Math.max(shake,.15);$('hurt').style.opacity=1;setTimeout(()=>{$('hurt').style.opacity=0;},150);noise(.08,.2,1200);if(player.hp<=0&&state==='play')endGame('lost','Officer down','The suspects are still in control.');}
-function hitEnemy(e){e.hp-=50;e.flash=.12;noise(.05,.15,1500);if(e.hp<=0){e.state='dead';killed++;toast('Suspect down',null);onDeath(e);}else goCombat(e,player.x,player.z);}
+function damagePlayer(n){if(player.armor>0){const ab=Math.min(player.armor,n);player.armor-=ab;n-=ab;if(player.armor<=0){player.armor=0;toast('Armor broken','#ff4a3c');}}player.hp=Math.max(0,player.hp-n);shake=Math.max(shake,.15);$('hurt').style.opacity=1;setTimeout(()=>{$('hurt').style.opacity=0;},150);noise(.08,.2,1200);if(player.hp<=0&&state==='play')endGame('lost','Officer down','The suspects are still in control.');}
+function hitEnemy(e,dmg){e.hp-=dmg||50;e.flash=.12;noise(.05,.15,1500);if(e.hp<=0){e.state='dead';killed++;toast('Suspect down',null);onDeath(e);}else goCombat(e,player.x,player.z);}
 function shoot(){
- player.cool=.17;player.ammo--;shake=Math.max(shake,.05);
- const a=player.h+(Math.random()-.5)*.03;spawnBullet(player.x+Math.cos(player.h)*.9,player.z+Math.sin(player.h)*.9,a,'p');
- const mz=player.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},60);noise(.12,.28,3200);
- makeNoise(player.x,player.z,60);
- for(const e of enemies){if(e.state==='dead'||e.state==='alert')continue;const rx=e.x-player.x,rz=e.z-player.z,al=rx*Math.cos(a)+rz*Math.sin(a),pp=Math.abs(-rx*Math.sin(a)+rz*Math.cos(a));if(al>0&&al<14&&pp<1.3&&los(player.x,player.z,e.x,e.z))goCombat(e,player.x,player.z);}
+ const w=wpn();player.cool=w.cool;player.ammo--;shake=Math.max(shake,w.gun==='smg'?.08:.05);
+ let a=player.h+(Math.random()-.5)*w.spread;
+ if(w.laser){let bd=.07;for(const e of enemies){if(e.state==='dead')continue;const dx=e.x-player.x,dz=e.z-player.z,dd=Math.hypot(dx,dz);if(dd>14||dd<1)continue;const an=Math.abs(angDiff(Math.atan2(dz,dx),a));if(an<bd&&los(player.x,player.z,e.x,e.z)){bd=an;a=Math.atan2(dz,dx);}}}
+ spawnBullet(player.x+Math.cos(player.h)*.9,player.z+Math.sin(player.h)*.9,a,'p',w.dmg);
+ const mz=player.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},60);noise(.12,w.sil?.03:.28,3200);
+ makeNoise(player.x,player.z,w.sil?9:60);
+ if(!w.sil)for(const e of enemies){if(e.state==='dead'||e.state==='alert')continue;const rx=e.x-player.x,rz=e.z-player.z,al=rx*Math.cos(a)+rz*Math.sin(a),pp=Math.abs(-rx*Math.sin(a)+rz*Math.cos(a));if(al>0&&al<14&&pp<1.3&&los(player.x,player.z,e.x,e.z))goCombat(e,player.x,player.z);}
 }
-function startReload(){if(player.reload>0||player.ammo===player.mag)return;player.reload=1.25;noise(.04,.2,6000);makeNoise(player.x,player.z,4);}
+function startReload(){if(player.reload>0||player.ammo===player.mag)return;player.reload=wpn().rel;noise(.04,.2,6000);makeNoise(player.x,player.z,4);}
 function nearWindow(){let best=null,bd=9;
  for(const k in wins){const w=wins[k];if(w.broken)continue;const dx=w.x+.5-player.x,dz=w.y+.5-player.z,dist=Math.hypot(dx,dz);if(dist>1.5)continue;
   if((dx*Math.cos(player.h)+dz*Math.sin(player.h))/Math.max(dist,.01)<.35)continue;if(dist<bd){bd=dist;best=w;}}
@@ -951,7 +975,7 @@ function updateBullets(dt){
    {const tx=Math.floor(b.x),ty=Math.floor(b.z),w=wins[ty*W+tx];if(w&&!w.broken){breakWindow(w,b.owner==='p');dead=true;break;}if(cover.has(ty*W+tx)){dead=true;spark(b.x,b.z);break;}}
    if(losBlock(Math.floor(b.x),Math.floor(b.z))){dead=true;spark(b.x,b.z);break;}
    if(b.owner==='p'){
-    for(const e of enemies)if(e.state!=='dead'&&(e.x-b.x)**2+(e.z-b.z)**2<.16){hitEnemy(e);dead=true;spark(b.x,b.z);break;}
+    for(const e of enemies)if(e.state!=='dead'&&(e.x-b.x)**2+(e.z-b.z)**2<.16){hitEnemy(e,b.dmg);dead=true;spark(b.x,b.z);break;}
     if(dead)break;
     for(const h of hostages)if((h.x-b.x)**2+(h.z-b.z)**2<.12){dead=true;if(state==='play')endGame('lost','Hostage hit','A round struck a hostage. Check your lane before you fire.');break;}
    }else if((player.x-b.x)**2+(player.z-b.z)**2<.14){damagePlayer(b.dmg);dead=true;}
@@ -966,9 +990,9 @@ function updateBullets(dt){
 
 /* ---------- game flow ---------- */
 function reset(){
- tk=null;grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;player.mesh.scale.y=1;
+ EN.saved=-1;EN.on=false;applyLoadout();hostages.forEach(h=>{h.gone=false;});tk=null;grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;player.mesh.scale.y=1;
  const sp=L.spawn;
- Object.assign(player,{crouch:false,cr:0,noiseLvl:0,stepT:0,stairCd:0,x:sp.x,z:sp.z,h:sp.h,hp:100,ammo:15,reload:0,cool:0,sp:0,vx:0,vz:0,push:0});
+ Object.assign(player,{crouch:false,cr:0,noiseLvl:0,stepT:0,stairCd:0,x:sp.x,z:sp.z,h:sp.h,hp:100,ammo:wpn().mag,mag:wpn().mag,armor:GEAR.armor>0?GEAR.armor:0,reload:0,cool:0,sp:0,vx:0,vz:0,push:0});
  enemies.forEach((e,i)=>{const d=L.enemyDefs[i];Object.assign(e,{x:d[0],z:d[1],h:d[2],hp:100,state:'idle',walking:false,wait:Math.random()*2+.5,chat:0,visit:null,shout:0,susT:0,look:0,arrived:false,joinT:0,faceT:0,iconT:0,burst:0,dodgeT:0,cool:0,stun:0,flash:0,fall:0,path:null,target:null,lost:0,react:0});e.mesh.rotation.z=0;e.mesh.rotation.x=0;e.grabbed=false;e.found=false;setState(e,'idle');setFlash(e.mesh,false);setPose(e);});
  hostages.forEach((h,i)=>{const d=L.hostageDefs[i];h.free=false;h.x=d[0];h.z=d[1];h.ring.material.color.setHex(0xffbf3c);setPose(h);h.mesh.position.y=-.12;});
  bullets.forEach(b=>scene.remove(b.m));bullets.length=0;resetDoors();killed=0;playTime=0;cutting=null;cutProg=0;timeLeft=L.timeLimit;
@@ -995,10 +1019,11 @@ function endGame(mode,title,sub){
  state=mode;$('hud').hidden=true;$('touch').style.display='none';$('hint').hidden=true;$('cut').style.display='none';
  $('screen').hidden=false;$('menuBox').hidden=true;$('settingsBox').hidden=true;$('endBox').hidden=false;
  $('endEye').textContent=mode==='won'?'Scene secure':'Mission failed';$('endTitle').textContent=title;
- const rescued=hostages.filter(h=>h.free).length,t=Math.floor(playTime),mm=String(Math.floor(t/60)).padStart(2,'0'),ss=String(t%60).padStart(2,'0');
+ const rescued=savedN();if(GEAR.armor>=0){GEAR.armor=Math.max(0,Math.round(player.armor));saveGear();}
+ const t=Math.floor(playTime),mm=String(Math.floor(t/60)).padStart(2,'0'),ss=String(t%60).padStart(2,'0');
  const pay=payout(mode==='won');
  if(mode==='won'&&BD.cur){BD.list=BD.list.filter(m=>m.id!==BD.cur.id);if(BD.sel===BD.cur.id)BD.sel=null;}
- $('endStats').innerHTML=sub+'<br>Difficulty: '+DF.name+'<br>Hostages freed: '+rescued+' / '+hostages.length+'<br>Suspects down: '+killed+' / '+enemies.length+'<br>Time: '+mm+':'+ss+(pay?'<br><br>Client: '+pay.client+'<br>'+(mode==='won'?'Contract: '+money(pay.base)+'<br>':'Contract failed — half bonus only<br>')+'Suspects ('+pay.nk+'): '+money(pay.kills)+'<br>Hostages saved ('+pay.ns+'): '+money(pay.saved)+'<br><b style="color:var(--green)">Earned: '+money(pay.total)+'</b> · Bank: '+money(CASH):'');
+ $('endStats').innerHTML=sub+'<br>Difficulty: '+DF.name+'<br>Hostages freed: '+rescued+' / '+hostages.length+'<br>Suspects down: '+killed+' / '+enemies.length+'<br>Time: '+mm+':'+ss+(pay?'<br><br>Client: '+pay.client+'<br>'+(mode==='won'?'Contract: '+money(pay.base)+'<br>':'Contract failed — half bonus only<br>')+'Suspects ('+pay.nk+'): '+money(pay.kills)+'<br>Hostages saved ('+pay.ns+'): '+money(pay.saved)+'<br><b style="color:var(--green)">Earned: '+money(pay.total)+'</b> · Bank: '+money(CASH):'')+(GEAR.armor===0?'<br><span style="color:var(--red)">Armor broken — repair it in the Armory.</span>':'');
 }
 function startGame(){audio();reset();state='play';$('hud').hidden=false;$('screen').hidden=true;$('hint').hidden=false;$('hint').style.opacity=1;setTimeout(()=>{$('hint').style.opacity=0;},9000);
  updateTouch();if(touchOn())$('hint').hidden=true;}
@@ -1403,7 +1428,7 @@ function payFor(m,kills,saved,won){
  const c=CLIENTS[m.client],k=DPAY[m.diff]*c.m,base=won?BPAY[m.type]*k:0,kp=kills*200*k,hp=saved*1200*k,f=won?1:.5;
  return {client:c.n,base:Math.round(base),kills:Math.round(kp*f),saved:Math.round(hp*f),total:Math.round(base+(kp+hp)*f)};
 }
-function payout(won){const m=BD.cur;if(!m)return null;const rescued=hostages.filter(h=>h.free).length,p=payFor(m,killed,rescued,won);p.nk=killed;p.ns=rescued;CASH+=p.total;saveCash();return p;}
+function payout(won){const m=BD.cur;if(!m)return null;const rescued=savedN(),p=payFor(m,killed,rescued,won);p.nk=killed;p.ns=rescued;CASH+=p.total;saveCash();return p;}
 const BD={list:[],sel:null,t:4.2,uid:0,open:false,built:false,fresh:{}};
 function mmss(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 function boardMapSVG(){
@@ -1475,6 +1500,149 @@ function startMission(){
  BD.cur=m;curLevel=m.type;$('board').hidden=true;BD.open=false;fogC.style.display='block';
  loadLevel(m.type,m.diff);startGame();
 }
+
+/* ---------- ending cutscenes: FBI breach / hostages run out ---------- */
+const EN={on:false,t:0,kind:'',ph:0,phT:0,agents:[],sched:[],saved:-1,focus:null};
+const EN_LINES={clear:"That's one mission down. Now who's buyin' me an Italian beef? Dipped. Hot peppers.",fbi:"Let the Feds clean up the mess. One mission down. Chicago sleeps a little easier tonight."};
+function savedN(){return EN.saved>=0?EN.saved:hostages.filter(h=>h.free).length;}
+function enSub(t){$('introSub').textContent=t;}
+function enKill(e){if(e.state==='dead')return;e.state='dead';e.hp=0;e.fall=0;e.path=null;noise(.1,.22,2400);spark(e.x,e.z,1.1);spark(e.x+.2,e.z,.8);}
+function startEnding(kind){
+ if(state!=='play')return;
+ EN.saved=hostages.filter(h=>h.free).length;
+ EN.on=true;EN.kind=kind;EN.t=0;EN.ph=0;EN.phT=0;EN.agents=[];EN.sched=[];EN.focus=player;
+ state='ending';
+ $('hud').hidden=true;$('hint').hidden=true;$('touch').style.display='none';$('cut').style.display='none';$('prompt').textContent='';fogC.style.display='none';
+ bullets.forEach(b=>scene.remove(b.m));bullets.length=0;player.vx=0;player.vz=0;cutting=null;cutProg=0;
+ for(const e of enemies)e.mesh.visible=true;
+ $('intro').hidden=false;requestAnimationFrame(()=>$('intro').classList.add('bars'));
+ if(kind==='fbi')fbiSetup();else runSetup();
+}
+function fbiSetup(){
+ const sp=L.spawn,alive=enemies.filter(e=>e.state!=='dead'),N=6;
+ enSub('FBI hostage rescue team breaching…');
+ for(let i=0;i<N;i++){
+  const m=makePerson({shirt:0x141c2e,vest:0x05070c,pants:0x0b0f18,skin:0xc9a07a,hat:'cap',armed:true,gun:'smg'});
+  const a={x:sp.x+(i%3-1)*.5,z:sp.z+(((i/3)|0)-.5)*.5,h:sp.h,r:.28,mesh:m,path:null,pt:0,target:null,q:[],tg:null,anim:0,st:0,shots:0,done:false};
+  setPose(a);EN.agents.push(a);}
+ const list=[];
+ for(const e of alive){const p=bfs(Math.floor(sp.x),Math.floor(sp.z),Math.floor(e.x),Math.floor(e.z));if(p.length)list.push({e,d:p.length});else EN.sched.push({e,t:2+Math.random()*8});}
+ list.sort((a,b)=>a.d-b.d);list.forEach((o,i)=>EN.agents[i%N].q.push(o.e));
+}
+function runSetup(){
+ const sp=L.spawn;enSub('Suspects down. Hostages are running out…');
+ for(const h of hostages){
+  h.free=true;h.ring.material.color.setHex(0x5fe28c);h.mesh.position.y=0;h.r=.28;h.gone=false;h.path=null;h.pt=0;h.delay=Math.random()*.9;
+  const f=flr(h.z);let tg={x:sp.x,z:sp.z};
+  if(f!==flr(sp.z)&&L.stairs&&L.stairs.length){let best=1e9;for(const s of L.stairs)for(const r of [s.a,s.b]){if(flr(r.y+.5)!==f)continue;const cx=r.x+r.w/2,cz=r.y+r.h/2,d=Math.hypot(cx-h.x,cz-h.z);if(d<best){best=d;tg={x:cx,z:cz};}}}
+  h.target=tg;}
+}
+function enTalk(){EN.ph=2;EN.phT=0;EN.focus=player;enSub(EN_LINES[EN.kind]);introSay(EN_LINES[EN.kind]);}
+function updateEnding(dt){
+ if(!EN.on)return;
+ EN.t+=dt;EN.phT+=dt;
+ for(const e of enemies)if(e.state==='dead')updateEnemy(e,dt);
+ if(EN.kind==='fbi'){
+  const sp=L.spawn;
+  if(EN.ph===0){
+   let cx=0,cz=0;
+   for(const a of EN.agents){
+    if(!a.tg||a.tg.state==='dead'){a.tg=a.q.shift()||null;a.path=null;a.pt=0;a.st=0;a.shots=0;}
+    let v=0;
+    if(a.tg){const e=a.tg,dx=e.x-a.x,dz=e.z-a.z,d=Math.hypot(dx,dz);
+     if(d<6.5&&los(a.x,a.z,e.x,e.z)){a.h=turnToward(a.h,Math.atan2(dz,dx),dt*12);a.st+=dt;
+      if(a.st>.28){a.st=0;a.shots++;const mz=a.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},50);noise(.07,.2,3000);spark(e.x,e.z,1+Math.random()*.4);if(a.shots>=3)enKill(e);}}
+     else{a.target={x:e.x,z:e.z};v=followPath(a,dt,6.2);}}
+    legs(a,v,dt);setPose(a);cx+=a.x;cz+=a.z;}
+   for(const s of EN.sched){s.t-=dt;if(s.t<=0&&s.e.state!=='dead'){const mm=s.e;noise(.12,.25,2600);setTimeout(()=>noise(.08,.2,2800),90);enKill(mm);}}
+   EN.focus={x:cx/EN.agents.length,z:cz/EN.agents.length};
+   if(!enemies.some(e=>e.state!=='dead')||EN.t>11){
+    for(const e of enemies)enKill(e);
+    EN.ph=1;EN.phT=0;enSub('Scene secure. The hostages are safe.');
+    for(const a of EN.agents){a.target={x:sp.x,z:sp.z};a.path=null;a.pt=0;}}
+  }else if(EN.ph===1){
+   let cx=0,cz=0,n=0;
+   for(const a of EN.agents){
+    if(a.done)continue;
+    const v=followPath(a,dt,5.2);legs(a,v,dt);setPose(a);
+    if(Math.hypot(a.x-sp.x,a.z-sp.z)<1.4||EN.phT>7){a.done=true;a.mesh.visible=false;continue;}
+    cx+=a.x;cz+=a.z;n++;}
+   if(n)EN.focus={x:cx/n,z:cz/n};
+   if(!n)enTalk();
+  }
+ }else if(EN.ph===0){
+  let cx=0,cz=0,n=0;
+  for(const h of hostages){
+   if(h.gone)continue;
+   h.delay-=dt;if(h.delay>0){cx+=h.x;cz+=h.z;n++;continue;}
+   const v=followPath(h,dt,5);legs(h,v,dt);setPose(h);
+   if(Math.hypot(h.x-h.target.x,h.z-h.target.z)<1.5||EN.phT>9){h.gone=true;continue;}
+   cx+=h.x;cz+=h.z;n++;}
+  if(n)EN.focus={x:cx/n,z:cz/n};else enTalk();
+ }
+ if(EN.ph===2&&EN.phT>5.2)finishEnding();
+}
+function finishEnding(){
+ if(!EN.on)return;EN.on=false;try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(e){}
+ for(const a of EN.agents)scene.remove(a.mesh);EN.agents=[];
+ $('intro').hidden=true;$('intro').classList.remove('bars');
+ endGame('won',EN.kind==='fbi'?'FBI took the building':'Building cleared',EN.kind==='fbi'?'Every hostage is out. The FBI breach team finished the rest.':'Every suspect is down. The hostages walked out safe.');
+}
+
+/* ---------- armory: weapons, attachments, armor ---------- */
+let GEAR={own:{},equip:'pistol',armor:-1};
+const ARMOR_MAX=50,ARMOR_PRICE=3000,REPAIR_PER=40;
+try{const s=JSON.parse(localStorage.getItem('hotEntryGear'));if(s&&typeof s==='object')GEAR={own:s.own||{},equip:s.equip||'pistol',armor:typeof s.armor==='number'?s.armor:-1};}catch(e){}
+function saveGear(){try{localStorage.setItem('hotEntryGear',JSON.stringify(GEAR));}catch(e){}}
+const WPN={pistol:{name:'Service pistol',dmg:50,cool:.17,mag:15,spread:.03,rel:1.25,gun:'pistol'},smg:{name:'Street sweeper SMG',dmg:34,cool:.085,mag:30,spread:.09,rel:1.7,gun:'smg'}};
+function wpn(){const b=WPN[GEAR.equip]||WPN.pistol,o=GEAR.own;
+ return {name:b.name,gun:b.gun,dmg:o.dmg?b.dmg*2:b.dmg,cool:o.rate?b.cool*.68:b.cool,mag:o.mag?Math.round(b.mag*1.6):b.mag,spread:o.laser?b.spread*.25:b.spread,rel:b.rel,sil:!!o.sil,laser:!!o.laser};}
+const ATTACH=[
+ {id:'sil',name:'Suppressor',price:4500,desc:'Shots are nearly silent. Enemies only notice if they are right next to you.'},
+ {id:'laser',name:'Laser sight',price:3500,desc:'Red beam, much tighter spread and a little aim assist.'},
+ {id:'dmg',name:'Hollow-point +P rounds',price:7000,desc:'Double damage. The pistol kills in one hit.'},
+ {id:'rate',name:'Trigger job',price:4000,desc:'Fires about 45% faster.'},
+ {id:'mag',name:'Extended magazine',price:2500,desc:'60% more rounds per mag.'}];
+const SMG_PRICE=9000;
+let gunSMG=null,laserM=null;
+function applyLoadout(){
+ if(!gunSMG){gunSMG=new THREE.Group();const b1=new THREE.Mesh(geo(.62,.14,.12),M(0x1a1a1a)),b2=new THREE.Mesh(geo(.09,.24,.1),M(0x111111));b1.position.set(.8,1.02,0);b2.position.set(.72,.86,0);gunSMG.add(b1,b2);player.mesh.add(gunSMG);}
+ gunSMG.visible=GEAR.equip==='smg';
+ if(!laserM){laserM=new THREE.Mesh(geo(1,.025,.025),new THREE.MeshBasicMaterial({color:0xff2a1a,transparent:true,opacity:.75}));laserM.visible=false;scene.add(laserM);}
+}
+function updateLaser(){
+ if(!laserM)return;const w=wpn();
+ if(state!=='play'||!w.laser||tk){laserM.visible=false;return;}
+ const c=Math.cos(player.h),s=Math.sin(player.h),len=castRay(player.x,player.z,player.h,14)-.9;
+ if(len<.2){laserM.visible=false;return;}
+ laserM.visible=true;laserM.scale.x=len;laserM.position.set(player.x+c*(.9+len/2),1.02,player.z+s*(.9+len/2));laserM.rotation.y=-player.h;
+}
+function armorFixCost(){return GEAR.armor<0?0:Math.round((ARMOR_MAX-GEAR.armor)*REPAIR_PER);}
+function shopRow(title,desc,right){return '<div class="srow"><div class="sinfo"><b>'+title+'</b><span>'+desc+'</span></div>'+right+'</div>';}
+function renderShop(){
+ $('sCash').textContent=money(CASH);
+ let h='<h3>Weapons</h3>';
+ for(const id of ['pistol','smg']){const b=WPN[id],owned=id==='pistol'||GEAR.own.smg,on=GEAR.equip===id;
+  const d=id==='pistol'?'Reliable. 15 rounds, 2 hits to drop a suspect.':'Rapid fire like the gunmen carry. 30 rounds, loud and hungry for ammo.';
+  h+=shopRow(b.name,d,owned?(on?'<button class="btn ghost sbtn" disabled>Equipped</button>':'<button class="btn sbtn" data-a="equip" data-id="'+id+'">Equip</button>'):'<button class="btn sbtn" data-a="buy" data-id="smg"'+(CASH<SMG_PRICE?' disabled':'')+'>'+money(SMG_PRICE)+'</button>');}
+ h+='<h3>Attachments <small>apply to your equipped weapon</small></h3>';
+ for(const a of ATTACH)h+=shopRow(a.name,a.desc,GEAR.own[a.id]?'<button class="btn ghost sbtn" disabled>Owned</button>':'<button class="btn sbtn" data-a="buy" data-id="'+a.id+'"'+(CASH<a.price?' disabled':'')+'>'+money(a.price)+'</button>');
+ h+='<h3>Armor</h3>';
+ if(GEAR.armor<0)h+=shopRow('Light body armor','Soaks '+ARMOR_MAX+' damage before it breaks. Broken plates must be repaired here before they work again.','<button class="btn sbtn" data-a="buy" data-id="armor"'+(CASH<ARMOR_PRICE?' disabled':'')+'>'+money(ARMOR_PRICE)+'</button>');
+ else{const c=armorFixCost();h+=shopRow('Light body armor','Plates: '+Math.round(GEAR.armor)+' / '+ARMOR_MAX+(GEAR.armor<=0?' — BROKEN':''),c?'<button class="btn sbtn" data-a="repair"'+(CASH<c?' disabled':'')+'>Repair '+money(c)+'</button>':'<button class="btn ghost sbtn" disabled>Intact</button>');}
+ $('sList').innerHTML=h;
+ $('sList').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>shopAct(b.dataset.a,b.dataset.id)));
+}
+function shopMsg(t,col){const e=$('sToast');e.textContent=t;e.style.color=col||'';e.classList.remove('go');void e.offsetWidth;e.classList.add('go');}
+function shopAct(a,id){
+ if(a==='equip'){GEAR.equip=id;saveGear();shopMsg(WPN[id].name+' equipped','#5fe28c');}
+ else if(a==='repair'){const c=armorFixCost();if(CASH<c)return;CASH-=c;GEAR.armor=ARMOR_MAX;saveCash();saveGear();shopMsg('Armor repaired','#5fe28c');}
+ else{let p=0;if(id==='smg')p=SMG_PRICE;else if(id==='armor')p=ARMOR_PRICE;else p=ATTACH.find(x=>x.id===id).price;
+  if(CASH<p){shopMsg('Not enough cash','#ff4a3c');return;}
+  CASH-=p;if(id==='armor')GEAR.armor=ARMOR_MAX;else GEAR.own[id]=1;saveCash();saveGear();shopMsg('Purchased','#5fe28c');}
+ renderShop();
+}
+function showShop(){state='shop';$('board').hidden=true;$('shop').hidden=false;renderShop();}
 
 /* ---------- camera + faded vision overlay ---------- */
 const cam={x:8.5,z:19.5};let camH=17,vw=1,vh=1;
@@ -1558,7 +1726,9 @@ function closeSettings(){
 function showLobby(){state='menu';$('board').hidden=true;BD.open=false;const s=$('screen');s.hidden=false;s.classList.add('lobby');['menuBox','settingsBox','endBox'].forEach(i=>$(i).hidden=true);$('lobbyBox').hidden=false;$('hud').hidden=true;$('touch').style.display='none';fogC.style.display='none';}
 $('lobbySetBtn').addEventListener('click',()=>openSettings('menu'));
 $('playBtn').addEventListener('click',()=>{introPrime();startIntro();});
-$('skipBtn').addEventListener('click',endIntro);
+$('skipBtn').addEventListener('click',()=>{if(state==='ending')finishEnding();else endIntro();});
+$('shopBtn').addEventListener('click',showShop);
+$('shopBack').addEventListener('click',()=>{$('shop').hidden=true;showBoard();});
 $('backBtn').addEventListener('click',()=>{$('menuBox').hidden=true;$('lobbyBox').hidden=false;$('screen').classList.add('lobby');});
 $('gear').addEventListener('click',()=>{if(state==='play')openSettings('game');});
 $('doneBtn').addEventListener('click',closeSettings);
@@ -1663,11 +1833,13 @@ function update(dt){
   if(cutting){const h=nearHostage();if(keys.KeyE&&h===cutting){cutProg+=dt/.9;$('cut').style.display='flex';$('cutFill').style.width=Math.min(100,cutProg*100)+'%';
     if(cutProg>=1){cutting.free=true;player.hp=Math.min(100,player.hp+30);cutting.ring.material.color.setHex(0x5fe28c);cutting.mesh.position.y=0;cutting=null;cutProg=0;$('cut').style.display='none';noise(.05,.2,5000);
      const n=hostages.filter(x=>x.free).length;toast('Hostage secured '+n+'/'+hostages.length+'  +30 HP','#5fe28c');
-     if(n===hostages.length)endGame('won','Entry complete','Every hostage is out and safe.');}}
+     }}
    else{cutting=null;cutProg=0;$('cut').style.display='none';}}
   enemies.forEach(e=>updateEnemy(e,dt));
   updateBullets(dt);
+  if(state==='play'&&!tk){const nH=hostages.length,fr=hostages.filter(h=>h.free).length,al=enemies.filter(e=>e.state!=='dead').length;if(enemies.length&&al===0)startEnding('clear');else if(nH&&fr===nH)startEnding('fbi');}
   hpFill.style.width=player.hp+'%';hpFill.style.background=player.hp>50?'var(--green)':player.hp>25?'var(--amber)':'var(--red)';hpNum.textContent=Math.ceil(player.hp);
+  {const ac=$('armChip');ac.hidden=GEAR.armor<0;if(GEAR.armor>=0){$('armFill').style.width=Math.max(0,player.armor/ARMOR_MAX*100)+'%';$('armNum').textContent=Math.ceil(player.armor);}}
   $('ammo').textContent=player.ammo+' / '+player.mag;$('reloadTag').textContent=player.reload>0?'reloading':'';
   $('hostages').textContent=hostages.filter(h=>h.free).length+' / '+hostages.length;
   $('hostiles').textContent=enemies.filter(e=>e.state!=='dead').length;
@@ -1677,14 +1849,15 @@ function update(dt){
  }
  hostages.forEach(h=>{h.ring.position.set(h.x,.03,h.z);h.ring.scale.setScalar(1+Math.sin(time*4)*.08);h.mesh.rotation.y=-h.h;});
  enemies.forEach(e=>{if(state!=='play')return;e.mesh.visible=canSee(e.x,e.z);});
- hostages.forEach(h=>{const v=state!=='play'||canSee(h.x,h.z);h.mesh.visible=v;h.ring.visible=v;});
- cam.x+=(player.x-cam.x)*Math.min(1,dt*6);cam.z+=(player.z-cam.z)*Math.min(1,dt*6);
+ hostages.forEach(h=>{const v=h.gone?false:(state!=='play'||canSee(h.x,h.z));h.mesh.visible=v;h.ring.visible=v;});
+ {const ft=(state==='ending'&&EN.focus)?EN.focus:player;cam.x+=(ft.x-cam.x)*Math.min(1,dt*6);cam.z+=(ft.z-cam.z)*Math.min(1,dt*6);}
+ updateLaser();
  shake=Math.max(0,shake-dt*1.2);const sx=(Math.random()-.5)*shake,sz=(Math.random()-.5)*shake;
  camera.position.set(cam.x+sx,camH,cam.z+camH*.28+sz);camera.lookAt(cam.x+sx,0,cam.z+sz);
  sun.position.set(cam.x-6,22,cam.z+8);sun.target.position.set(cam.x,0,cam.z);
 }
 let last=performance.now();
-function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(state==='board'){updateBoard(dt);requestAnimationFrame(frame);return;}if((state==='menu'||state==='intro')&&lobbyScene){updateLobby(dt);if(state==='intro')updateIntro(dt);lobbyCam.updateProjectionMatrix();renderer.render(lobbyScene,lobbyCam);requestAnimationFrame(frame);return;}update(dt);renderer.render(scene,camera);drawFog();requestAnimationFrame(frame);}
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(state==='board'||state==='shop'){if(state==='board')updateBoard(dt);requestAnimationFrame(frame);return;}if(state==='ending')updateEnding(dt);if((state==='menu'||state==='intro')&&lobbyScene){updateLobby(dt);if(state==='intro')updateIntro(dt);lobbyCam.updateProjectionMatrix();renderer.render(lobbyScene,lobbyCam);requestAnimationFrame(frame);return;}update(dt);renderer.render(scene,camera);drawFog();requestAnimationFrame(frame);}
 let curLevel='house';
 try{const s=localStorage.getItem('hotEntryLevel');if(LEVELS[s])curLevel=s;}catch(e){}
 function applyLevelUI(){
