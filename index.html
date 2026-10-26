@@ -773,7 +773,7 @@ function makeBank(){
  const doorInfo=finishDoors(grid,[[22,6,1],[23,6,1],[22,28,1],[23,28,1],[10,10],[35,10],[10,14],[35,14],[16,16],[29,16],[10,18],[35,18]],0x6b5a46,0x2a3f5c);
  const furniture=[
   // back alley
-  {t:'cruiser',x:14,y:2,w:4,h:2,f:'n'},{t:'crate',x:30,y:2,w:1,h:1},{t:'crate',x:31,y:2,w:1,h:1},{t:'crate',x:31,y:3,w:1,h:1},{t:'sedan',x:36,y:2,w:4,h:2,f:'s'},
+  {t:'sedan',x:14,y:2,w:4,h:2,f:'n'},{t:'crate',x:30,y:2,w:1,h:1},{t:'crate',x:31,y:2,w:1,h:1},{t:'crate',x:31,y:3,w:1,h:1},{t:'sedan',x:36,y:2,w:4,h:2,f:'s'},
   {t:'bush',x:2,y:2,w:1,h:1},{t:'bush',x:43,y:2,w:1,h:1},{t:'tree',x:2,y:4,w:1,h:1},{t:'tree',x:43,y:4,w:1,h:1},{t:'bush',x:8,y:5,w:1,h:1},{t:'bush',x:9,y:5,w:1,h:1},
   // rear hallway
   {t:'plant',x:5,y:7,w:1,h:1,f:'s'},{t:'plant',x:40,y:7,w:1,h:1,f:'s'},{t:'couch',x:12,y:7,w:3,h:1,f:'s',c:0x44546a},{t:'couch',x:30,y:7,w:3,h:1,f:'s',c:0x44546a},{t:'cooler',x:18,y:7,w:1,h:1,f:'s'},{t:'cooler',x:27,y:7,w:1,h:1,f:'s'},
@@ -793,11 +793,11 @@ function makeBank(){
   {t:'vending',x:6,y:19,w:1,h:1,f:'s'},{t:'vending',x:39,y:19,w:1,h:1,f:'s'},{t:'plant',x:5,y:19,w:1,h:1,f:'s'},{t:'plant',x:40,y:19,w:1,h:1,f:'s'},{t:'plant',x:5,y:27,w:1,h:1,f:'n'},{t:'plant',x:40,y:27,w:1,h:1,f:'n'},
   {t:'couch',x:12,y:25,w:3,h:1,f:'s',c:0x6b4b2a},{t:'couch',x:31,y:25,w:3,h:1,f:'s',c:0x6b4b2a},{t:'plant',x:17,y:27,w:1,h:1,f:'n'},{t:'plant',x:28,y:27,w:1,h:1,f:'n'},
   // front street: police line
-  {t:'pcar',x:6,y:32,w:4,h:2,f:'n'},{t:'pcar',x:13,y:32,w:4,h:2,f:'n'},{t:'pcar',x:28,y:32,w:4,h:2,f:'n'},{t:'pcar',x:35,y:32,w:4,h:2,f:'n'},{t:'pcar',x:9,y:35,w:4,h:2,f:'n'},{t:'pcar',x:31,y:35,w:4,h:2,f:'n'},
+  {t:'cruiser',x:17,y:32,w:4,h:2,f:'n'},{t:'pcar',x:6,y:32,w:4,h:2,f:'n'},{t:'pcar',x:13,y:32,w:4,h:2,f:'n'},{t:'pcar',x:28,y:32,w:4,h:2,f:'n'},{t:'pcar',x:35,y:32,w:4,h:2,f:'n'},{t:'pcar',x:9,y:35,w:4,h:2,f:'n'},{t:'pcar',x:31,y:35,w:4,h:2,f:'n'},
   {t:'tree',x:3,y:30,w:1,h:1},{t:'tree',x:42,y:30,w:1,h:1}
  ];
- for(const x of [8,11,15,19,26,30,34,38])furniture.push({t:'cop',x,y:30,w:1,h:1,f:'n'});
- furniture.push({t:'cop',x:21,y:31,w:1,h:1,f:'n'},{t:'cop',x:24,y:31,w:1,h:1,f:'n'},{t:'cop',x:12,y:31,w:1,h:1,f:'n'},{t:'cop',x:33,y:31,w:1,h:1,f:'n'});
+ const copDefs=[];
+ for(const [x,y] of [[8,30],[11,30],[15,30],[19,30],[26,30],[30,30],[34,30],[38,30],[21,31],[24,31],[12,31],[33,31],[11,33],[25,34],[40,33],[5,34],[33,33],[14,34]]){furniture.push({t:'copblock',x,y,w:1,h:1,f:'n'});copDefs.push([x+.5,y+.5]);}
  furniture.forEach(f=>{if(f.nc)return;for(let y=f.y;y<f.y+f.h;y++)for(let x=f.x;x<f.x+f.w;x++)grid[y][x]=4;});
  const windows=[];
  for(const x of [7,9,11,13,15,17,19,26,28,30,32,34,36,38,40])windows.push([x+.5,28.5,true]);
@@ -812,7 +812,7 @@ function makeBank(){
   [12.5,8.5,0],[32.5,8.5,P],[10.5,12.5,P],[35.5,12.5,0],[7.5,16.5,0],[36.5,16.5,P],[7.5,22.5,0]];
  const hostageDefs=[[6.5,25.5],[38.5,25.5],[7.5,13.5],[13.5,16.5],[18.5,17.5]];
  return {id:'bank',W,H,grid,kind,doorInfo,furniture,offz:0,stairs:[],rooms:[],windows,pictures:[],
-  spawn:{x:22.5,z:3.6,h:P/2},entry:{x:22.5,z:30.5,h:-P/2},timeLimit:360,enemyDefs,hostageDefs,paint:paintBank,
+  spawn:{x:22.5,z:29.7,h:-P/2},entry:{x:22.5,z:30.5,h:-P/2},copDefs,timeLimit:360,enemyDefs,hostageDefs,paint:paintBank,
   inside:(x,z)=>x>=5&&x<41&&z>=7&&z<28,hasDrill:true,drillDef:{x:23,z:15.5}};
 }
 function paintBank(){
@@ -847,6 +847,7 @@ B.pcar=(g,w,d)=>{
  bx(g,.3,.12,.5,0x2f6bff,-.15,1.32,-.35,0x2f6bff);bx(g,.3,.12,.5,0xff3b30,-.15,1.32,.35,0xff3b30);
  bx(g,.1,.14,.3,0xfff1c4,w/2-.2,.6,-.55,0xfff1c4);bx(g,.1,.14,.3,0xfff1c4,w/2-.2,.6,.55,0xfff1c4);
 };
+B.copblock=()=>{};
 B.cop=(g)=>{
  bx(g,.2,.65,.2,0x14213d,-.12,.33,0);bx(g,.2,.65,.2,0x14213d,.12,.33,0);bx(g,.5,.6,.3,0x1d3557,0,.95,0);
  bx(g,.12,.55,.12,0x1d3557,-.31,.95,0);bx(g,.12,.55,.12,0x1d3557,.31,.95,0);bx(g,.28,.28,.28,0xd9a27a,0,1.45,0);
@@ -871,7 +872,7 @@ B.vaultdoor=(g,w,d)=>{
 };
 LEVELS.bank=makeBank;
 LEVEL_INFO.bank={name:'First Mutual Bank',tag:'6:00',desc:'Active robbery. 20 suspects, 5 hostages, a vault drill.',dispatch:'Dispatch 10-31 · Robbery in progress · 5 hostages · vault drill',
- brief:'Armed crew inside First Mutual. Patrol cars have the front covered, so go in the back. A thermite drill will breach the vault in three minutes: shoot it or kick it to pieces before it finishes. Six minutes total before the hostages are executed.'};
+ brief:'Armed crew inside First Mutual. You start out front with the patrol units, who are only laying down cover fire. Storm the front doors or loop around to the back alley. A thermite drill will breach the vault in three minutes: shoot it or kick it to pieces before it finishes. Six minutes total before the hostages are executed.'};
 
 /* ---------- audio ---------- */
 let AC=null;
@@ -886,9 +887,9 @@ const keys={};let mouseDown=false,state='menu',time=0,playTime=0,killed=0,shake=
 const player={x:8.5,z:19.5,h:-Math.PI/2,r:.28,hp:100,ammo:15,mag:15,reload:0,cool:0,sp:0,anim:0,push:0,mesh:makePerson({shirt:0x1d3557,vest:0x0e1626,pants:0x14213d,skin:0xd9a27a,hat:'cap',armed:true})};
 let enemies=[],hostages=[],timeLeft=0,nearTrunk=false;
 function flr(z){return L&&L.offz&&z>=L.offz-10?1:0;}
-function clearEntities(){enemies.forEach(e=>scene.remove(e.mesh));hostages.forEach(h=>{scene.remove(h.mesh);scene.remove(h.ring);});enemies=[];hostages=[];}
+function clearEntities(){clearCops();enemies.forEach(e=>scene.remove(e.mesh));hostages.forEach(h=>{scene.remove(h.mesh);scene.remove(h.ring);});enemies=[];hostages=[];}
 function spawnEntities(){
- clearEntities();
+ clearEntities();spawnCops();
  enemies=L.enemyDefs.map((d,i)=>{const smg=i%2===1;return {x:d[0],z:d[1],h:d[2],baseH:d[2],r:.28,inOnly:!!L.inside,smg,aim:!smg,homeX:d[0],homeZ:d[1],seed:i*1.7,mesh:makePerson({shirt:smg?0x5a1e1e:0x2a2a30,vest:smg?0x2f3326:0,pants:0x1c1c20,skin:0xc48a64,hat:'hood',armed:true,gun:smg?'smg':'pistol'})};});
  hostages=L.hostageDefs.map(d=>{const ring=new THREE.Mesh(new THREE.RingGeometry(.5,.66,32),new THREE.MeshBasicMaterial({color:0xffbf3c,transparent:true,opacity:.85}));ring.rotation.x=-Math.PI/2;ring.position.y=.03;scene.add(ring);
   return {x:d[0],z:d[1],h:Math.random()*6,ring,mesh:makePerson({shirt:0xe07a1f,pants:0x5b6b7c,skin:0xe0b090,hair:0x5a3a22,armed:false})};});
@@ -1839,6 +1840,46 @@ function updateAllies(dt){
  }
 }
 
+/* ---------- ambient firefight outside the bank (visual only, zero damage) ---------- */
+let COPS=[],AMB=[],ambT=0,ambSnd=0;
+function clearCops(){for(const c of COPS)scene.remove(c.mesh);for(const t of AMB)scene.remove(t.m);COPS=[];AMB=[];}
+function spawnCops(){
+ if(!L.copDefs)return;
+ COPS=L.copDefs.map((d,i)=>{const mesh=makePerson({shirt:0x1d3557,vest:0x0e1626,pants:0x14213d,skin:0xd9a27a,hat:'cap',armed:true});
+  const c={x:d[0],z:d[1],h:-Math.PI/2,r:.28,mesh,cd:Math.random()*2.5,burst:0,bt:0,duck:0,seed:i*1.9};setPose(c);return c;});
+}
+function ambTracer(x,z,tx,tz,enemy){
+ const a=Math.atan2(tz-z,tx-x),m=new THREE.Mesh(bulletGeo,enemy?bmE:bmP);m.position.set(x,1.05,z);m.rotation.y=-a;scene.add(m);
+ AMB.push({m,x,z,a,tx,tz,d:Math.hypot(tx-x,tz-z)});
+}
+function updateCops(dt){
+ if(!COPS.length)return;
+ ambSnd-=dt;
+ const pl=player;
+ for(const c of COPS){
+  if(c.duck>0){c.duck-=dt;c.mesh.scale.y=.72;}else c.mesh.scale.y=1;
+  c.cd-=dt;
+  if(c.burst>0){c.bt-=dt;
+   if(c.bt<=0){c.bt=.13;c.burst--;
+    const tx=6+Math.random()*34,tz=29.1,a=Math.atan2(tz-c.z,tx-c.x);c.h=a;
+    ambTracer(c.x+Math.cos(a)*.9,c.z+Math.sin(a)*.9,tx,tz,false);
+    const mz=c.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},45);
+    if(ambSnd<=0&&Math.hypot(c.x-pl.x,c.z-pl.z)<24){ambSnd=.08;noise(.05,.07,2600);}
+    if(c.burst===0&&Math.random()<.3)c.duck=.9;}
+  }else if(c.cd<=0){c.burst=1+((Math.random()*3)|0);c.bt=0;c.cd=.9+Math.random()*2.6;}
+  c.h=c.h;setPose(c);c.mesh.visible=canSee(c.x,c.z);
+ }
+ // suspects firing back out of the front windows
+ ambT-=dt;
+ if(ambT<=0){ambT=.7+Math.random()*1.5;const ws=L.windows.filter(w=>w[1]>28&&w[1]<29);
+  if(ws.length){const w=ws[(Math.random()*ws.length)|0],c=COPS[(Math.random()*COPS.length)|0];
+   ambTracer(w[0],29.0,c.x+(Math.random()-.5)*1.2,c.z+(Math.random()-.5)*1.2,true);
+   if(ambSnd<=0&&Math.hypot(w[0]-pl.x,29-pl.z)<24){ambSnd=.08;noise(.05,.08,1800);}}}
+ for(let i=AMB.length-1;i>=0;i--){const t=AMB[i];const s=26*dt;t.x+=Math.cos(t.a)*s;t.z+=Math.sin(t.a)*s;t.d-=s;t.m.position.x=t.x;t.m.position.z=t.z;
+  t.m.visible=canSee(t.x,t.z);
+  if(t.d<=0){spark(t.tx,t.tz,1.0);scene.remove(t.m);AMB.splice(i,1);}}
+}
+
 /* ---------- camera + faded vision overlay ---------- */
 const cam={x:8.5,z:19.5};let camH=17,vw=1,vh=1;
 const fogC=$('fog'),fctx=fogC.getContext('2d');let fw=1,fh=1;
@@ -2031,7 +2072,7 @@ function update(dt){
      }}
    else{cutting=null;cutProg=0;$('cut').style.display='none';}}
   enemies.forEach(e=>updateEnemy(e,dt));
-  updateBullets(dt);updateDrill(dt);updateAllies(dt);
+  updateBullets(dt);updateDrill(dt);updateAllies(dt);updateCops(dt);
   if(state==='play'&&!tk){const nH=hostages.length,fr=hostages.filter(h=>h.free).length,al=enemies.filter(e=>e.state!=='dead').length,dOK=!(DR&&DR.alive);if(enemies.length&&al===0&&dOK)startEnding('clear');else if(nH&&fr===nH&&dOK)startEnding('fbi');else if(nH&&fr===nH&&!allyOn&&DR)spawnAllies();}
   hpFill.style.width=player.hp+'%';hpFill.style.background=player.hp>50?'var(--green)':player.hp>25?'var(--amber)':'var(--red)';hpNum.textContent=Math.ceil(player.hp);
   {const ac=$('armChip');ac.hidden=GEAR.armor<0;if(GEAR.armor>=0){$('armFill').style.width=Math.max(0,player.armor/armorMax()*100)+'%';$('armNum').textContent=Math.ceil(player.armor);}}
