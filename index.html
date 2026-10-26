@@ -71,6 +71,11 @@ body{background:var(--ink);color:var(--fg);font-family:var(--mono);overflow:hidd
 #mToast.go{animation:tin 3.4s ease forwards}@keyframes tin{0%{opacity:0;transform:translate(-50%,-30px)}10%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-10px)}}
 @media (max-aspect-ratio:1/1),(max-width:720px){#board{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}#mapHost{order:-1}#side{border-right:0;border-top:1px solid var(--line);max-height:50vh;padding:12px 14px}#side h2{font-size:30px}#mList{display:none}}
 .chip[hidden]{display:none}
+#vaultBox{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:6;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(8,11,18,.82);border:1px solid var(--red);padding:6px 16px 8px;min-width:180px;pointer-events:none}
+#vaultBox[hidden]{display:none}#vaultBox .lbl{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+#vaultT{font-family:var(--display);font-weight:900;font-size:36px;letter-spacing:.08em;line-height:1;color:var(--amber)}
+#vaultBox .bar{width:100%;height:5px;background:rgba(255,255,255,.14)}#vaultBox .bar i{display:block;height:100%;background:var(--red)}
+#vaultBox.low #vaultT{color:var(--red);animation:blink .6s steps(2) infinite}#vaultBox.ok{border-color:var(--green)}#vaultBox.ok #vaultT{color:var(--green);font-size:24px}@keyframes blink{50%{opacity:.35}}
 #shop{position:fixed;inset:0;z-index:13;background:#0d121b;overflow:auto;padding:max(18px,env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) max(24px,env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px))}
 #shop[hidden]{display:none}
 .sbox{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
@@ -174,6 +179,7 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
   <button data-k="KeyC" style="right:calc(108px + env(safe-area-inset-right,0px));bottom:calc(162px + env(safe-area-inset-bottom,0px))">CRCH</button>
   <button data-k="KeyR" style="right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(158px + env(safe-area-inset-bottom,0px))">RLD</button>
 </div>
+<div id="vaultBox" hidden><span class="lbl" id="vaultLbl">Vault drill</span><b id="vaultT">03:00</b><div class="bar"><i id="vaultFill"></i></div></div>
 <div id="board" hidden>
   <div id="side">
     <div class="hd"><h2>Chicago<br>Contracts</h2><span id="mCount">0 open</span></div>
@@ -253,7 +259,7 @@ function tileSolid(tx,ty){if(tx<0||ty<0||tx>=W||ty>=H)return true;const v=grid[t
 function losBlock(tx,ty){if(tx<0||ty<0||tx>=W||ty>=H)return true;const v=grid[ty][tx];if(v===1)return !wins[ty*W+tx];return v===3&&!doors[ty*W+tx].open;}
 function collides(x,z,r){const x0=Math.floor(x-r),x1=Math.floor(x+r),z0=Math.floor(z-r),z1=Math.floor(z+r);
  for(let ty=z0;ty<=z1;ty++)for(let tx=x0;tx<=x1;tx++){if(tileSolid(tx,ty)){const cx=Math.max(tx,Math.min(x,tx+1)),cz=Math.max(ty,Math.min(z,ty+1));const dx=x-cx,dz=z-cz;if(dx*dx+dz*dz<r*r)return true;}}return false;}
-function moveEnt(e,dx,dz){const cw=wins[Math.floor(e.z)*W+Math.floor(e.x)];if(cw&&cw.broken){dx*=.5;dz*=.5;}if(!collides(e.x+dx,e.z,e.r))e.x+=dx;if(!collides(e.x,e.z+dz,e.r))e.z+=dz;}
+function moveEnt(e,dx,dz){if(e.inOnly&&L.inside){if(!L.inside(e.x+dx,e.z))dx=0;if(!L.inside(e.x,e.z+dz))dz=0;}const cw=wins[Math.floor(e.z)*W+Math.floor(e.x)];if(cw&&cw.broken){dx*=.5;dz*=.5;}if(!collides(e.x+dx,e.z,e.r))e.x+=dx;if(!collides(e.x,e.z+dz,e.r))e.z+=dz;}
 function los(x0,z0,x1,z1){const dx=x1-x0,dz=z1-z0,n=Math.ceil(Math.hypot(dx,dz)/0.12);for(let i=1;i<n;i++){const t=i/n;if(losBlock(Math.floor(x0+dx*t),Math.floor(z0+dz*t)))return false;}return true;}
 function castRay(x,z,a,range){const cx=Math.cos(a),cz=Math.sin(a);let d=0;while(d<range){const nd=d+0.1;if(losBlock(Math.floor(x+cx*nd),Math.floor(z+cz*nd)))return Math.min(range,d+0.2);d=nd;}return range;}
 function angDiff(a,b){let d=a-b;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return d;}
@@ -707,7 +713,7 @@ function renderLevel(){
   B[f.t](gr,lw,ld,f);
   gr.rotation.y=ROT[f.f||'n'];gr.position.set(f.x+f.w/2,0,f.y+f.h/2);levelRoot.add(gr);
   if(f.t==='cruiser'&&cruiser){gr.updateMatrixWorld(true);const p=new THREE.Vector3(-2.35,0,0).applyMatrix4(gr.matrixWorld);cruiser.tx=p.x;cruiser.tz=p.z;}
-  if(f.t!=='cruiser')gr.traverse(o=>{o.matrixAutoUpdate=false;o.updateMatrix();});
+  if(f.t!=='cruiser'&&f.t!=='drill')gr.traverse(o=>{o.matrixAutoUpdate=false;o.updateMatrix();});
  });
  // real windows: sill + header + breakable glass
  {const gm=new THREE.MeshLambertMaterial({color:0x9fd0ff,transparent:true,opacity:.34,emissive:0x17304a,depthWrite:false});
@@ -750,6 +756,123 @@ function makePerson(o){
 }
 function setFlash(g,on){for(const m of g.userData.mats)m.emissive.setHex(on?0x886655:0x000000);}
 
+/* ---------- bank robbery map ---------- */
+let drillBit=null,drillGroup=null;
+function makeBank(){
+ const W=46,H=38,grid=newGrid(W,H,0),kind=newGrid(W,H,0);
+ const hwall=(y,x1,x2,k)=>{for(let x=x1;x<=x2;x++){grid[y][x]=1;kind[y][x]=k;}};
+ const vwall=(x,y1,y2,k)=>{for(let y=y1;y<=y2;y++){grid[y][x]=1;kind[y][x]=k;}};
+ for(let x=0;x<W;x++){grid[0][x]=2;grid[H-1][x]=2;}
+ for(let y=0;y<H;y++){grid[y][0]=2;grid[y][W-1]=2;}
+ hwall(6,4,41,1);hwall(28,4,41,1);vwall(4,6,28,1);vwall(41,6,28,1);
+ hwall(10,5,16,2);hwall(10,29,40,2);
+ for(let y=10;y<=14;y++)for(let x=17;x<=28;x++){grid[y][x]=1;kind[y][x]=3;}
+ hwall(14,5,16,2);hwall(14,29,40,2);
+ vwall(16,10,17,2);vwall(29,10,17,2);
+ hwall(18,5,40,2);for(let x=20;x<=25;x++)grid[18][x]=0;
+ const doorInfo=finishDoors(grid,[[22,6,1],[23,6,1],[22,28,1],[23,28,1],[10,10],[35,10],[10,14],[35,14],[16,16],[29,16],[10,18],[35,18]],0x6b5a46,0x2a3f5c);
+ const furniture=[
+  // back alley
+  {t:'cruiser',x:14,y:2,w:4,h:2,f:'n'},{t:'crate',x:30,y:2,w:1,h:1},{t:'crate',x:31,y:2,w:1,h:1},{t:'crate',x:31,y:3,w:1,h:1},{t:'sedan',x:36,y:2,w:4,h:2,f:'s'},
+  {t:'bush',x:2,y:2,w:1,h:1},{t:'bush',x:43,y:2,w:1,h:1},{t:'tree',x:2,y:4,w:1,h:1},{t:'tree',x:43,y:4,w:1,h:1},{t:'bush',x:8,y:5,w:1,h:1},{t:'bush',x:9,y:5,w:1,h:1},
+  // rear hallway
+  {t:'plant',x:5,y:7,w:1,h:1,f:'s'},{t:'plant',x:40,y:7,w:1,h:1,f:'s'},{t:'couch',x:12,y:7,w:3,h:1,f:'s',c:0x44546a},{t:'couch',x:30,y:7,w:3,h:1,f:'s',c:0x44546a},{t:'cooler',x:18,y:7,w:1,h:1,f:'s'},{t:'cooler',x:27,y:7,w:1,h:1,f:'s'},
+  // manager office
+  {t:'desk',x:6,y:11,w:3,h:1,f:'s'},{t:'deskchair',x:7,y:12,w:1,h:1,f:'n',nc:true},{t:'bookshelf',x:12,y:11,w:2,h:1,f:'s'},{t:'plant',x:5,y:13,w:1,h:1,f:'s'},
+  // server room
+  {t:'rack',x:31,y:11,w:1,h:1,f:'s'},{t:'rack',x:32,y:11,w:1,h:1,f:'s'},{t:'rack',x:33,y:11,w:1,h:1,f:'s'},{t:'rack',x:37,y:11,w:1,h:1,f:'s'},{t:'rack',x:38,y:11,w:1,h:1,f:'s'},{t:'rack',x:39,y:11,w:1,h:1,f:'s'},
+  // staff room
+  {t:'ctable',x:8,y:16,w:3,h:1,f:'n'},{t:'cooler',x:15,y:15,w:1,h:1,f:'s'},{t:'plant',x:5,y:17,w:1,h:1,f:'s'},
+  // security room
+  {t:'monitorwall',x:30,y:15,w:5,h:1,f:'s'},{t:'cabinet',x:40,y:15,w:1,h:2,f:'w'},
+  // vault hall
+  {t:'vaultdoor',x:21,y:14,w:4,h:1,f:'s',nc:true},{t:'drill',x:22,y:15,w:2,h:1,f:'n'},
+  {t:'crate',x:17,y:15,w:1,h:1},{t:'crate',x:28,y:15,w:1,h:1},{t:'cabinet',x:18,y:15,w:2,h:1,f:'s'},{t:'cabinet',x:26,y:15,w:2,h:1,f:'s'},
+  // lobby
+  {t:'teller',x:10,y:22,w:24,h:1,f:'s'},{t:'desk',x:12,y:19,w:2,h:1,f:'s'},{t:'desk',x:21,y:19,w:2,h:1,f:'s'},{t:'desk',x:29,y:19,w:2,h:1,f:'s'},
+  {t:'vending',x:6,y:19,w:1,h:1,f:'s'},{t:'vending',x:39,y:19,w:1,h:1,f:'s'},{t:'plant',x:5,y:19,w:1,h:1,f:'s'},{t:'plant',x:40,y:19,w:1,h:1,f:'s'},{t:'plant',x:5,y:27,w:1,h:1,f:'n'},{t:'plant',x:40,y:27,w:1,h:1,f:'n'},
+  {t:'couch',x:12,y:25,w:3,h:1,f:'s',c:0x6b4b2a},{t:'couch',x:31,y:25,w:3,h:1,f:'s',c:0x6b4b2a},{t:'plant',x:17,y:27,w:1,h:1,f:'n'},{t:'plant',x:28,y:27,w:1,h:1,f:'n'},
+  // front street: police line
+  {t:'pcar',x:6,y:32,w:4,h:2,f:'n'},{t:'pcar',x:13,y:32,w:4,h:2,f:'n'},{t:'pcar',x:28,y:32,w:4,h:2,f:'n'},{t:'pcar',x:35,y:32,w:4,h:2,f:'n'},{t:'pcar',x:9,y:35,w:4,h:2,f:'n'},{t:'pcar',x:31,y:35,w:4,h:2,f:'n'},
+  {t:'tree',x:3,y:30,w:1,h:1},{t:'tree',x:42,y:30,w:1,h:1}
+ ];
+ for(const x of [8,11,15,19,26,30,34,38])furniture.push({t:'cop',x,y:30,w:1,h:1,f:'n'});
+ furniture.push({t:'cop',x:21,y:31,w:1,h:1,f:'n'},{t:'cop',x:24,y:31,w:1,h:1,f:'n'},{t:'cop',x:12,y:31,w:1,h:1,f:'n'},{t:'cop',x:33,y:31,w:1,h:1,f:'n'});
+ furniture.forEach(f=>{if(f.nc)return;for(let y=f.y;y<f.y+f.h;y++)for(let x=f.x;x<f.x+f.w;x++)grid[y][x]=4;});
+ const windows=[];
+ for(const x of [7,9,11,13,15,17,19,26,28,30,32,34,36,38,40])windows.push([x+.5,28.5,true]);
+ for(const y of [20,23,26]){windows.push([4.5,y+.5,false]);windows.push([41.5,y+.5,false]);}
+ for(const x of [8,13,32,37])windows.push([x+.5,6.5,true]);
+ windows.push([4.5,8.5,false],[41.5,8.5,false]);
+ const P=Math.PI;
+ // first four guard the drill (pistol, smg, pistol, smg), then front guards, hidden tellers, patrols
+ const enemyDefs=[[19.5,16.5,0],[26.5,16.5,P],[20.5,15.5,0],[25.5,15.5,P],
+  [20.5,25.5,P/2],[25.5,25.5,P/2],[18.5,24.5,P/2],[27.5,24.5,P/2],[16.5,26.5,P/2],[29.5,26.5,P/2],
+  [14.5,20.5,P/2],[22.5,20.5,P/2],[30.5,20.5,P/2],
+  [12.5,8.5,0],[32.5,8.5,P],[10.5,12.5,P],[35.5,12.5,0],[7.5,16.5,0],[36.5,16.5,P],[7.5,22.5,0]];
+ const hostageDefs=[[6.5,25.5],[38.5,25.5],[7.5,13.5],[13.5,16.5],[18.5,17.5]];
+ return {id:'bank',W,H,grid,kind,doorInfo,furniture,offz:0,stairs:[],rooms:[],windows,pictures:[],
+  spawn:{x:22.5,z:3.6,h:P/2},entry:{x:22.5,z:30.5,h:-P/2},timeLimit:360,enemyDefs,hostageDefs,paint:paintBank,
+  inside:(x,z)=>x>=5&&x<41&&z>=7&&z<28,hasDrill:true,drillDef:{x:23,z:15.5}};
+}
+function paintBank(){
+ rect(0,0,45,37,'#2d4a2b');speckle(0,0,45,37,['#35582f','#27422a','#3b6034','#2a4a2d'],6000);
+ rect(1,1,44,5,'#33363c');speckle(1,1,44,5,['#3b3e45','#2b2e34'],900);
+ g.fillStyle='rgba(235,225,150,.7)';for(let x=2;x<44;x+=4)g.fillRect(x*TS,3*TS-1,2*TS,2);
+ rect(1,29,44,30,'#a9a8a2');speckle(1,29,44,30,['#9a9993','#b8b7b1'],600);
+ g.strokeStyle='rgba(60,60,60,.35)';g.lineWidth=1;for(let x=1;x<=45;x+=2){g.beginPath();g.moveTo(x*TS,29*TS);g.lineTo(x*TS,31*TS);g.stroke();}
+ rect(1,31,44,36,'#2c2f35');speckle(1,31,44,36,['#34373d','#25282d','#383b42'],1600);
+ g.fillStyle='rgba(235,200,60,.85)';for(let x=1;x<45;x+=3)g.fillRect(x*TS,34*TS-2,1.6*TS,4);
+ rect(5,7,40,27,'#c8c4b8');
+ checker(5,7,40,9,'#b9bcc2','#a9acb2');
+ rect(5,11,15,13,'#4f5f7a');speckle(5,11,15,13,['#596a87','#465570'],200);rug(6,12,10,13,'#7b3f3f','#d6c28f');
+ rect(30,11,40,13,'#3a424d');speckle(30,11,40,13,['#454e5a','#313944'],200);
+ rect(5,15,15,17,'#8a7d62');speckle(5,15,15,17,['#948769','#7e7258'],200);
+ rect(30,15,40,17,'#2f3745');speckle(30,15,40,17,['#394255','#272e3b'],200);
+ rect(17,15,28,17,'#4a5058');g.strokeStyle='rgba(255,255,255,.12)';g.lineWidth=1;for(let x=17;x<=29;x++){g.beginPath();g.moveTo(x*TS,15*TS);g.lineTo(x*TS,18*TS);g.stroke();}
+ g.save();g.beginPath();g.rect(20*TS,17*TS,6*TS,TS);g.clip();g.fillStyle='rgba(232,194,58,.9)';for(let i=-4;i<14;i++){g.beginPath();g.moveTo(20*TS+i*TS*.6,17*TS);g.lineTo(20*TS+i*TS*.6+TS*.3,17*TS);g.lineTo(20*TS+i*TS*.6+TS*.6,18*TS);g.lineTo(20*TS+i*TS*.6+TS*.3,18*TS);g.fill();}g.restore();
+ checker(5,19,40,27,'#e6e2d8','#d1ccbd');
+ rect(10,19,33,21,'#6b2f3a');speckle(10,19,33,21,['#7a3945','#5d2832'],300);
+ rug(15,23,30,26,'#7a2f2f','#d8c9a0');
+}
+// ---- builders ----
+B.teller=(g,w,d)=>{
+ bx(g,w,.95,d,0x7a6a55,0,.48,0);bx(g,w+.1,.07,d+.14,0xe9e5da,0,.99,0);
+ const n=Math.floor(w/2);
+ for(let i=0;i<n;i++){const x=-w/2+1+i*(w/n);bx(g,w/n-.5,.62,.04,0x9fd0f0,x,1.38,.15);bx(g,.2,.3,.04,0x111a24,x+.2,1.15,-.1,0x0d1c2c);bx(g,.28,.03,.12,0xd4af37,x-.4,1.04,-.2);}
+};
+B.pcar=(g,w,d)=>{
+ bx(g,w-.4,.5,d-.2,0xf4f4f4,0,.52,0);bx(g,w-.4,.26,d-.18,0x14161a,0,.36,0);bx(g,w*.46,.42,d-.34,0x16181c,-.15,.98,0);bx(g,w*.4,.24,d-.3,0x2a3a50,-.15,1.03,0);
+ for(const sx of [-w*.3,w*.3])for(const sz of [-d*.4,d*.4])bx(g,.62,.36,.16,0x0a0a0a,sx,.18,sz);
+ bx(g,.3,.12,.5,0x2f6bff,-.15,1.32,-.35,0x2f6bff);bx(g,.3,.12,.5,0xff3b30,-.15,1.32,.35,0xff3b30);
+ bx(g,.1,.14,.3,0xfff1c4,w/2-.2,.6,-.55,0xfff1c4);bx(g,.1,.14,.3,0xfff1c4,w/2-.2,.6,.55,0xfff1c4);
+};
+B.cop=(g)=>{
+ bx(g,.2,.65,.2,0x14213d,-.12,.33,0);bx(g,.2,.65,.2,0x14213d,.12,.33,0);bx(g,.5,.6,.3,0x1d3557,0,.95,0);
+ bx(g,.12,.55,.12,0x1d3557,-.31,.95,0);bx(g,.12,.55,.12,0x1d3557,.31,.95,0);bx(g,.28,.28,.28,0xd9a27a,0,1.45,0);
+ bx(g,.34,.1,.34,0x14213d,0,1.64,0);bx(g,.3,.03,.18,0x0b0b0b,0,1.55,-.2);bx(g,.1,.1,.1,0x111114,.3,.68,-.12);
+};
+B.drill=(g,w,d)=>{
+ bx(g,w-.2,.12,d-.1,0x2a2d33,0,.06,0);
+ for(const sx of [-.8,.8])for(const sz of [-.3,.3])bx(g,.1,.8,.1,0x555b66,sx,.45,sz);
+ bx(g,.9,.7,.6,0xd9a31b,0,.95,.08);bx(g,.5,.25,.34,0x2b2f38,0,1.45,.1);bx(g,.2,.12,.2,0xff2a1a,.3,1.32,.25,0xff2a1a);
+ const bg=new THREE.Group();bg.position.set(0,1.0,-.25);g.add(bg);
+ const cy=new THREE.Mesh(new THREE.CylinderGeometry(.17,.07,.9,10),M(0x9aa3ad));cy.rotation.x=Math.PI/2;cy.position.z=-.28;bg.add(cy);
+ bx(bg,.4,.05,.05,0x2c3038,0,0,-.35);bx(bg,.05,.4,.05,0x2c3038,0,0,-.2);
+ drillBit=bg;drillGroup=g;
+};
+B.vaultdoor=(g,w,d)=>{
+ bx(g,3.0,2.5,.24,0x2a2f38,0,1.25,-.6);
+ const dk=new THREE.Mesh(new THREE.CylinderGeometry(1.08,1.08,.3,30),M(0x8d97a3));dk.rotation.x=Math.PI/2;dk.position.set(0,1.25,-.8);dk.castShadow=true;g.add(dk);
+ const rg=new THREE.Mesh(new THREE.CylinderGeometry(1.18,1.18,.14,30),M(0x4a525e));rg.rotation.x=Math.PI/2;rg.position.set(0,1.25,-.68);g.add(rg);
+ for(let i=0;i<10;i++){const a=i/10*6.283;bx(g,.13,.13,.12,0x5a626e,Math.cos(a)*.88,1.25+Math.sin(a)*.88,-1.0);}
+ bx(g,.9,.09,.09,0xd4af37,0,1.25,-1.02);bx(g,.09,.9,.09,0xd4af37,0,1.25,-1.02);bx(g,.28,.28,.14,0xd4af37,0,1.25,-1.02);
+ bx(g,1.5,.3,.05,0x14171d,0,2.35,-.75);
+};
+LEVELS.bank=makeBank;
+LEVEL_INFO.bank={name:'First Mutual Bank',tag:'6:00',desc:'Active robbery. 20 suspects, 5 hostages, a vault drill.',dispatch:'Dispatch 10-31 · Robbery in progress · 5 hostages · vault drill',
+ brief:'Armed crew inside First Mutual. Patrol cars have the front covered, so go in the back. A thermite drill will breach the vault in three minutes: shoot it or kick it to pieces before it finishes. Six minutes total before the hostages are executed.'};
+
 /* ---------- audio ---------- */
 let AC=null;
 function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}return AC;}
@@ -766,7 +889,7 @@ function flr(z){return L&&L.offz&&z>=L.offz-10?1:0;}
 function clearEntities(){enemies.forEach(e=>scene.remove(e.mesh));hostages.forEach(h=>{scene.remove(h.mesh);scene.remove(h.ring);});enemies=[];hostages=[];}
 function spawnEntities(){
  clearEntities();
- enemies=L.enemyDefs.map((d,i)=>{const smg=i%2===1;return {x:d[0],z:d[1],h:d[2],baseH:d[2],r:.28,smg,aim:!smg,homeX:d[0],homeZ:d[1],seed:i*1.7,mesh:makePerson({shirt:smg?0x5a1e1e:0x2a2a30,vest:smg?0x2f3326:0,pants:0x1c1c20,skin:0xc48a64,hat:'hood',armed:true,gun:smg?'smg':'pistol'})};});
+ enemies=L.enemyDefs.map((d,i)=>{const smg=i%2===1;return {x:d[0],z:d[1],h:d[2],baseH:d[2],r:.28,inOnly:!!L.inside,smg,aim:!smg,homeX:d[0],homeZ:d[1],seed:i*1.7,mesh:makePerson({shirt:smg?0x5a1e1e:0x2a2a30,vest:smg?0x2f3326:0,pants:0x1c1c20,skin:0xc48a64,hat:'hood',armed:true,gun:smg?'smg':'pistol'})};});
  hostages=L.hostageDefs.map(d=>{const ring=new THREE.Mesh(new THREE.RingGeometry(.5,.66,32),new THREE.MeshBasicMaterial({color:0xffbf3c,transparent:true,opacity:.85}));ring.rotation.x=-Math.PI/2;ring.position.y=.03;scene.add(ring);
   return {x:d[0],z:d[1],h:Math.random()*6,ring,mesh:makePerson({shirt:0xe07a1f,pants:0x5b6b7c,skin:0xe0b090,hair:0x5a3a22,armed:false})};});
 }
@@ -864,6 +987,7 @@ function breakWindow(w,byPlayer,loud){
  if(byPlayer)makeNoise(cx,cz,loud?19:15);
 }
 function kick(){
+ if(DR&&DR.alive){const dx=DR.x-player.x,dz=DR.z-player.z,dist=Math.hypot(dx,dz);if(dist<2.4&&(dx*Math.cos(player.h)+dz*Math.sin(player.h))/Math.max(dist,.01)>.25){damageDrill(150);thump();shake=Math.max(shake,.4);toast('Drill kicked','#ffbf3c');makeNoise(DR.x,DR.z,18);return;}}
  const nw=nearWindow();
  let best=null,bd=9;
  for(const k in doors){const d=doors[k];if(d.open)continue;const dx=d.x+.5-player.x,dz=d.y+.5-player.z,dist=Math.hypot(dx,dz);if(dist>1.5)continue;
@@ -973,6 +1097,7 @@ function updateBullets(dt){
   for(let s=0;s<steps&&!dead;s++){
    b.x+=sx;b.z+=sz;
    {const tx=Math.floor(b.x),ty=Math.floor(b.z),w=wins[ty*W+tx];if(w&&!w.broken){breakWindow(w,b.owner==='p');dead=true;break;}if(cover.has(ty*W+tx)){dead=true;spark(b.x,b.z);break;}}
+   if(b.owner==='p'&&damageAt(b.x,b.z)){damageDrill(b.dmg);dead=true;break;}
    if(losBlock(Math.floor(b.x),Math.floor(b.z))){dead=true;spark(b.x,b.z);break;}
    if(b.owner==='p'){
     for(const e of enemies)if(e.state!=='dead'&&(e.x-b.x)**2+(e.z-b.z)**2<.16){hitEnemy(e,b.dmg);dead=true;spark(b.x,b.z);break;}
@@ -990,7 +1115,7 @@ function updateBullets(dt){
 
 /* ---------- game flow ---------- */
 function reset(){
- EN.saved=-1;EN.on=false;applyLoadout();hostages.forEach(h=>{h.gone=false;});tk=null;grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;player.mesh.scale.y=1;
+ resetDrill();EN.saved=-1;EN.on=false;applyLoadout();hostages.forEach(h=>{h.gone=false;});tk=null;grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;player.mesh.scale.y=1;
  const sp=L.spawn;
  Object.assign(player,{crouch:false,cr:0,noiseLvl:0,stepT:0,stairCd:0,x:sp.x,z:sp.z,h:sp.h,hp:100,ammo:wpn().mag,mag:wpn().mag,armor:GEAR.armor>0?GEAR.armor:0,reload:0,cool:0,sp:0,vx:0,vz:0,push:0});
  enemies.forEach((e,i)=>{const d=L.enemyDefs[i];Object.assign(e,{x:d[0],z:d[1],h:d[2],hp:100,state:'idle',walking:false,wait:Math.random()*2+.5,chat:0,visit:null,shout:0,susT:0,look:0,arrived:false,joinT:0,faceT:0,iconT:0,burst:0,dodgeT:0,cool:0,stun:0,flash:0,fall:0,path:null,target:null,lost:0,react:0});e.mesh.rotation.z=0;e.mesh.rotation.x=0;e.grabbed=false;e.found=false;setState(e,'idle');setFlash(e.mesh,false);setPose(e);});
@@ -1003,7 +1128,7 @@ function scaleEnemies(){
  if(want<n){const out=[];for(let i=0;i<want;i++)out.push(base[Math.floor(i*n/want)]);L.enemyDefs=out;}
  else if(want>n){const out=base.slice();let tries=0;
   while(out.length<want&&tries++<600){const s=base[(Math.random()*n)|0],a=Math.random()*6.283,r=1+Math.random()*2.2,x=s[0]+Math.cos(a)*r,z=s[1]+Math.sin(a)*r;
-   if(collides(x,z,.4)||Math.hypot(x-L.spawn.x,z-L.spawn.z)<7)continue;
+   if(collides(x,z,.4)||(L.inside&&!L.inside(x,z))||Math.hypot(x-L.spawn.x,z-L.spawn.z)<7)continue;
    if(out.some(o=>Math.hypot(o[0]-x,o[1]-z)<.9))continue;
    out.push([x,z,Math.random()*6.283]);}
   L.enemyDefs=out;}
@@ -1016,7 +1141,7 @@ function loadLevel(id,diff){
  renderLevel();spawnEntities();reset();
 }
 function endGame(mode,title,sub){
- state=mode;$('hud').hidden=true;$('touch').style.display='none';$('hint').hidden=true;$('cut').style.display='none';
+ state=mode;$('vaultBox').hidden=true;$('hud').hidden=true;$('touch').style.display='none';$('hint').hidden=true;$('cut').style.display='none';
  $('screen').hidden=false;$('menuBox').hidden=true;$('settingsBox').hidden=true;$('endBox').hidden=false;
  $('endEye').textContent=mode==='won'?'Scene secure':'Mission failed';$('endTitle').textContent=title;
  const rescued=savedN();if(GEAR.armor>=0){GEAR.armor=Math.max(0,Math.round(player.armor));saveGear();}
@@ -1418,9 +1543,9 @@ function updateIntro(dt){
 /* ---------- contract board: map of Chicago with popping-up missions ---------- */
 const SPOTS=[['Rogers Park',380,46],['O’Hare',88,78],['Uptown',372,104],['Lakeview',352,152],['Lincoln Park',372,205],['Logan Square',262,160],['Wicker Park',300,208],['Austin',150,252],['Gold Coast',390,258],['River North',372,288],['The Loop',380,326],['West Loop',326,322],['Garfield Park',214,300],['Pilsen',305,376],['Chinatown',352,398],['Bronzeville',378,436],['Midway',214,436],['Back of the Yards',286,458],['Hyde Park',372,494],['South Shore',360,538]];
 const DCOL=[null,'#4fd08a','#a6d84a','#ffbf3c','#ff8a3c','#ff4a3c','#d4217a'];
-const BASEM={house:{en:6,ho:3,t:240,name:'Residential siege'},office:{en:30,ho:10,t:600,name:'Tower takeover'}};
+const BASEM={bank:{en:20,ho:5,t:360,name:'Bank robbery'},house:{en:6,ho:3,t:240,name:'Residential siege'},office:{en:30,ho:10,t:600,name:'Tower takeover'}};
 const CLIENTS=[{n:'Chicago PD',m:1},{n:'Illinois State Police',m:1.15},{n:'FBI',m:1.4},{n:'Foreign government',m:1.75},{n:'Private security firm',m:2.1}];
-const DPAY=[0,.6,.8,1,1.3,1.7,2.2],BPAY={house:3000,office:8000};
+const DPAY=[0,.6,.8,1,1.3,1.7,2.2],BPAY={house:3000,office:8000,bank:6500};
 let CASH=0;try{CASH=+localStorage.getItem('hotEntryCash')||0;}catch(e){}
 function money(n){return '$'+Math.round(n).toLocaleString('en-US');}
 function saveCash(){try{localStorage.setItem('hotEntryCash',String(CASH));}catch(e){}}
@@ -1456,7 +1581,7 @@ function pinSVG(m){
   +'<circle class="pr" r="14" fill="'+c+'"/><circle r="22" fill="transparent"/>'
   +(sel?'<circle r="19" fill="none" stroke="#fff" stroke-width="2"/>':'')
   +'<circle r="12" fill="'+c+'" stroke="#0b0f17" stroke-width="2"/><text y="4.5" text-anchor="middle" font-size="13" font-weight="800" fill="#0b0f17" font-family="IBM Plex Mono,monospace">'+m.diff+'</text>'
-  +'<g transform="translate(10 -11)"><circle r="6.5" fill="#0b0f17" stroke="'+c+'" stroke-width="1.2"/>'+(m.type==='house'?'<path d="M-3.6,0.8 L0,-3 L3.6,0.8 M-2.6,0 V3.4 H2.6 V0" fill="none" stroke="#fff" stroke-width="1.2"/>':'<path d="M-2.8,3.6 V-3.6 H2.8 V3.6 M-1,-1.8 h2 M-1,0.4 h2 M-1,2.4 h2" fill="none" stroke="#fff" stroke-width="1"/>')+'</g></g>';
+  +'<g transform="translate(10 -11)"><circle r="6.5" fill="#0b0f17" stroke="'+c+'" stroke-width="1.2"/>'+(m.type==='bank'?'<text y="3" text-anchor="middle" font-size="8" font-weight="800" fill="#fff" font-family="IBM Plex Mono,monospace">$</text>':m.type==='house'?'<path d="M-3.6,0.8 L0,-3 L3.6,0.8 M-2.6,0 V3.4 H2.6 V0" fill="none" stroke="#fff" stroke-width="1.2"/>':'<path d="M-2.8,3.6 V-3.6 H2.8 V3.6 M-1,-1.8 h2 M-1,0.4 h2 M-1,2.4 h2" fill="none" stroke="#fff" stroke-width="1"/>')+'</g></g>';
 }
 function drawBoard(){
  if(!BD.built){$('mapSvg').innerHTML=boardMapSVG();BD.built=true;}
@@ -1479,7 +1604,7 @@ function addMission(){
  const used=new Set(BD.list.map(m=>m.spot)),free=SPOTS.map((_,i)=>i).filter(i=>!used.has(i));
  if(BD.list.length>=8){const k=BD.list.findIndex(m=>m.id!==BD.sel);if(k>=0)BD.list.splice(k,1);}
  const pool=free.length?free:SPOTS.map((_,i)=>i),w=[3,3,3,3,2,2];let diff=0,r=Math.random()*16;for(let i=0;i<6;i++){r-=w[i];if(r<=0){diff=i+1;break;}}
- const m={id:++BD.uid,spot:pool[(Math.random()*pool.length)|0],type:Math.random()<.5?'house':'office',diff:diff||3,client:(Math.random()*CLIENTS.length)|0};
+ const m={id:++BD.uid,spot:pool[(Math.random()*pool.length)|0],type:['house','office','bank'][(Math.random()*3)|0],diff:diff||3,client:(Math.random()*CLIENTS.length)|0};
  BD.list.push(m);BD.fresh[m.id]=3;
  if(BD.sel==null)BD.sel=m.id;
  drawBoard();
@@ -1488,7 +1613,7 @@ function addMission(){
 }
 function showBoard(){
  state='board';BD.open=true;BD.t=BD.list.length?5:.3;
- ['screen','intro','hud'].forEach(i=>$(i).hidden=true);$('touch').style.display='none';fogC.style.display='none';
+ ['screen','intro','hud','vaultBox'].forEach(i=>$(i).hidden=true);$('touch').style.display='none';fogC.style.display='none';
  wireBoard();if(BD.sel==null||!BD.list.some(m=>m.id===BD.sel))BD.sel=BD.list.length?BD.list[0].id:null;
  $('board').hidden=false;drawBoard();
 }
@@ -1510,17 +1635,17 @@ function enSub(t){$('introSub').textContent=t;}
 function enKill(e){if(e.state==='dead')return;e.state='dead';e.hp=0;e.fall=0;e.path=null;noise(.1,.22,2400);spark(e.x,e.z,1.1);spark(e.x+.2,e.z,.8);}
 function startEnding(kind){
  if(state!=='play')return;
- EN.saved=hostages.filter(h=>h.free).length;
+ EN.saved=hostages.filter(h=>h.free).length;clearAllies();
  EN.on=true;EN.kind=kind;EN.t=0;EN.ph=0;EN.phT=0;EN.agents=[];EN.sched=[];EN.focus=player;
  state='ending';
- $('hud').hidden=true;$('hint').hidden=true;$('touch').style.display='none';$('cut').style.display='none';$('prompt').textContent='';fogC.style.display='none';
+ $('hud').hidden=true;$('vaultBox').hidden=true;$('hint').hidden=true;$('touch').style.display='none';$('cut').style.display='none';$('prompt').textContent='';fogC.style.display='none';
  bullets.forEach(b=>scene.remove(b.m));bullets.length=0;player.vx=0;player.vz=0;cutting=null;cutProg=0;
  for(const e of enemies)e.mesh.visible=true;
  $('intro').hidden=false;requestAnimationFrame(()=>$('intro').classList.add('bars'));
  if(kind==='fbi')fbiSetup();else runSetup();
 }
 function fbiSetup(){
- const sp=L.spawn,alive=enemies.filter(e=>e.state!=='dead'),N=6;
+ const sp=L.entry||L.spawn,alive=enemies.filter(e=>e.state!=='dead'),N=6;
  enSub('FBI hostage rescue team breaching…');
  for(let i=0;i<N;i++){
   const m=makePerson({shirt:0x141c2e,vest:0x05070c,pants:0x0b0f18,skin:0xc9a07a,hat:'cap',armed:true,gun:'smg'});
@@ -1531,7 +1656,7 @@ function fbiSetup(){
  list.sort((a,b)=>a.d-b.d);list.forEach((o,i)=>EN.agents[i%N].q.push(o.e));
 }
 function runSetup(){
- const sp=L.spawn;enSub('Suspects down. Hostages are running out…');
+ const sp=L.entry||L.spawn;enSub('Suspects down. Hostages are running out…');
  for(const h of hostages){
   h.free=true;h.ring.material.color.setHex(0x5fe28c);h.mesh.position.y=0;h.r=.28;h.gone=false;h.path=null;h.pt=0;h.delay=Math.random()*.9;
   const f=flr(h.z);let tg={x:sp.x,z:sp.z};
@@ -1544,7 +1669,7 @@ function updateEnding(dt){
  EN.t+=dt;EN.phT+=dt;
  for(const e of enemies)if(e.state==='dead')updateEnemy(e,dt);
  if(EN.kind==='fbi'){
-  const sp=L.spawn;
+  const sp=L.entry||L.spawn;
   if(EN.ph===0){
    let cx=0,cz=0;
    for(const a of EN.agents){
@@ -1652,6 +1777,67 @@ function shopAct(a,id){
  renderShop();
 }
 function showShop(){state='shop';$('board').hidden=true;$('shop').hidden=false;renderShop();}
+
+/* ---------- vault drill objective + live FBI allies ---------- */
+let DR=null,ALLY=[],allyOn=false;
+function resetDrill(){
+ clearAllies();allyOn=false;
+ if(L.hasDrill&&drillGroup){DR={x:L.drillDef.x,z:L.drillDef.z,hp:600,max:600,alive:true,t:180,doneT:0,sparkT:0,group:drillGroup,bit:drillBit};drillGroup.visible=true;}
+ else DR=null;
+ const vb=$('vaultBox');if(vb)vb.hidden=!DR;
+}
+function damageDrill(n){
+ if(!DR||!DR.alive)return;DR.hp-=n;
+ noise(.05,.2,2000);spark(DR.x+(Math.random()-.5),DR.z-.4,1+Math.random()*.6);
+ if(DR.hp<=0){
+  DR.alive=false;DR.doneT=0;DR.group.visible=false;
+  for(let i=0;i<30;i++)spark(DR.x+(Math.random()-.5)*1.6,DR.z+(Math.random()-.5)*.9,.4+Math.random()*1.6);
+  for(let x=Math.floor(DR.x-1);x<=Math.floor(DR.x);x++)if(grid[15]&&grid[15][x]===4)grid[15][x]=0;
+  noise(.5,.4,900);thump();shake=Math.max(shake,.6);toast('Drill destroyed','#5fe28c');makeNoise(DR.x,DR.z,30);
+ }
+}
+function updateDrill(dt){
+ if(!DR)return;
+ const vb=$('vaultBox');
+ if(DR.alive){
+  DR.t-=dt;DR.bit.rotation.z+=dt*35;DR.sparkT-=dt;
+  if(DR.sparkT<=0){DR.sparkT=.12;spark(DR.x+(Math.random()-.5)*.3,DR.z-.75,.9+Math.random()*.4);}
+  $('vaultT').textContent=fmtT(DR.t);$('vaultFill').style.width=Math.max(0,DR.hp/DR.max*100)+'%';
+  vb.classList.toggle('low',DR.t<30);vb.classList.remove('ok');$('vaultLbl').textContent='Vault drill';
+  if(DR.t<=0){DR.t=0;endGame('lost','Vault breached','The crew drilled through and got away with the cash.');}
+ }else{
+  DR.doneT+=dt;vb.classList.remove('low');vb.classList.add('ok');$('vaultLbl').textContent='Drill destroyed';$('vaultT').textContent='VAULT SAFE';$('vaultFill').style.width='0%';
+  vb.hidden=DR.doneT>6;
+ }
+}
+function damageAt(x,z){return !!(DR&&DR.alive&&Math.abs(x-DR.x)<1.1&&Math.abs(z-DR.z)<.65);}
+function clearAllies(){for(const a of ALLY)scene.remove(a.mesh);ALLY=[];}
+function spawnAllies(){
+ allyOn=true;toast('FBI team entering — hold the line','#5fe28c');
+ const sp=L.entry||L.spawn;
+ for(let i=0;i<6;i++){
+  const m=makePerson({shirt:0x141c2e,vest:0x05070c,pants:0x0b0f18,skin:0xc9a07a,hat:'cap',armed:true,gun:'smg'});
+  const a={x:sp.x+(i%3-1)*.6,z:sp.z+(((i/3)|0)-.5)*.6,h:sp.h,r:.28,mesh:m,path:null,pt:0,target:null,tg:null,hp:100,st:0,anim:0,delay:i*.45,spd:5+Math.random()*1.2,dead:false,fall:0};
+  setPose(a);m.visible=false;ALLY.push(a);}
+}
+function allyHit(e,n){
+ if(e.state==='dead')return;e.hp-=n;e.flash=.12;noise(.04,.1,1600);spark(e.x,e.z,1.1);
+ if(e.hp<=0){e.state='dead';e.fall=0;e.path=null;onDeath(e);}else goCombat(e,player.x,player.z);
+}
+function updateAllies(dt){
+ for(const a of ALLY){
+  if(a.hp<=0){if(!a.dead){a.dead=true;a.fall=0;noise(.08,.2,900);}a.fall=Math.min(1,a.fall+dt*3);a.mesh.rotation.z=-1.55*a.fall;a.mesh.position.y=.18*a.fall;a.mesh.visible=canSee(a.x,a.z);continue;}
+  if(a.delay>0){a.delay-=dt;continue;}
+  if(!a.tg||a.tg.state==='dead'){a.tg=null;let bd=1e9;for(const e of enemies){if(e.state==='dead')continue;const dd=Math.hypot(e.x-a.x,e.z-a.z);if(dd<bd){bd=dd;a.tg=e;}}a.path=null;a.pt=0;}
+  let v=0;
+  if(a.tg){const e=a.tg,dx=e.x-a.x,dz=e.z-a.z,d=Math.hypot(dx,dz);
+   if(d<8&&los(a.x,a.z,e.x,e.z)){a.h=turnToward(a.h,Math.atan2(dz,dx),dt*12);a.st+=dt;
+    if(a.st>.48){a.st=0;const mz=a.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},50);noise(.05,.12,3000);if(Math.random()<.5)allyHit(e,36);}}
+   else{a.target={x:e.x,z:e.z};v=followPath(a,dt,a.spd);}}
+  for(const e of enemies){if(e.state!=='alert')continue;const dd=Math.hypot(e.x-a.x,e.z-a.z);if(dd<9&&los(e.x,e.z,a.x,a.z))a.hp-=dt*(e.smg?11:7);}
+  legs(a,v,dt);setPose(a);a.mesh.visible=canSee(a.x,a.z);
+ }
+}
 
 /* ---------- camera + faded vision overlay ---------- */
 const cam={x:8.5,z:19.5};let camH=17,vw=1,vh=1;
@@ -1845,15 +2031,15 @@ function update(dt){
      }}
    else{cutting=null;cutProg=0;$('cut').style.display='none';}}
   enemies.forEach(e=>updateEnemy(e,dt));
-  updateBullets(dt);
-  if(state==='play'&&!tk){const nH=hostages.length,fr=hostages.filter(h=>h.free).length,al=enemies.filter(e=>e.state!=='dead').length;if(enemies.length&&al===0)startEnding('clear');else if(nH&&fr===nH)startEnding('fbi');}
+  updateBullets(dt);updateDrill(dt);updateAllies(dt);
+  if(state==='play'&&!tk){const nH=hostages.length,fr=hostages.filter(h=>h.free).length,al=enemies.filter(e=>e.state!=='dead').length,dOK=!(DR&&DR.alive);if(enemies.length&&al===0&&dOK)startEnding('clear');else if(nH&&fr===nH&&dOK)startEnding('fbi');else if(nH&&fr===nH&&!allyOn&&DR)spawnAllies();}
   hpFill.style.width=player.hp+'%';hpFill.style.background=player.hp>50?'var(--green)':player.hp>25?'var(--amber)':'var(--red)';hpNum.textContent=Math.ceil(player.hp);
   {const ac=$('armChip');ac.hidden=GEAR.armor<0;if(GEAR.armor>=0){$('armFill').style.width=Math.max(0,player.armor/armorMax()*100)+'%';$('armNum').textContent=Math.ceil(player.armor);}}
   $('ammo').textContent=player.ammo+' / '+player.mag;$('reloadTag').textContent=player.reload>0?'reloading':'';
   $('hostages').textContent=hostages.filter(h=>h.free).length+' / '+hostages.length;
   $('hostiles').textContent=enemies.filter(e=>e.state!=='dead').length;
   $('stance').textContent=player.crouch?'Crouch':'Stand';
-  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&player.hp<100)txt=player.sp<1.2?'Healing from the med kit':'Stand still to heal';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';}
+  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(DR&&DR.alive&&Math.hypot(DR.x-player.x,DR.z-player.z)<2.4)txt='Kick the drill \u00b7 or shoot it';else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&player.hp<100)txt=player.sp<1.2?'Healing from the med kit':'Stand still to heal';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';}
   $('clock').textContent=fmtT(timeLeft);$('rec').classList.toggle('low',timeLeft<60);
  }
  hostages.forEach(h=>{h.ring.position.set(h.x,.03,h.z);h.ring.scale.setScalar(1+Math.sin(time*4)*.08);h.mesh.rotation.y=-h.h;});
