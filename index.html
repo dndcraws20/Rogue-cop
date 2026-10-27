@@ -141,6 +141,10 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
 .opt .keys{margin-top:2px}
 @media (max-width:520px){.bar{width:64px}.keys{grid-template-columns:minmax(0,1fr)}}
 @media (prefers-reduced-motion:reduce){#rec::before{animation:none}}
+#rec{position:relative}#rec #clock{display:inline-block;font-size:22px;font-weight:700}
+#tpen{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:8px;font-size:16px;font-weight:700;color:var(--red);opacity:0;transition:opacity .25s;white-space:nowrap;pointer-events:none}#tpen.show{opacity:1}
+#rec.hit #clock{animation:clockhit .55s}@keyframes clockhit{0%{color:var(--red);transform:scale(1.4)}100%{transform:scale(1)}}
+#execBan{position:fixed;left:50%;top:86px;transform:translateX(-50%);background:var(--red);color:#fff;padding:7px 14px;font-size:12px;letter-spacing:.14em;border-radius:3px;z-index:9;animation:blink 1s steps(2) infinite;pointer-events:none}#execBan[hidden]{display:none}
 </style>
 
 <div id="stage"></div>
@@ -152,15 +156,16 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
     <div class="chip"><span class="lbl">Health</span><div class="bar"><i id="hpFill"></i></div><b id="hpNum">100</b></div>
     <div class="chip"><span class="lbl">Noise</span><div class="bar"><i id="noiseFill" style="width:0;background:var(--amber)"></i></div></div>
     <div class="chip"><span class="lbl">Stance</span><b id="stance">Stand</b></div>
-    <div class="chip"><span class="lbl">Mag</span><b id="ammo">15</b><span class="lbl" id="reloadTag"></span></div>
+    <div class="chip"><span class="lbl">Ammo</span><b id="ammo">15</b><span class="lbl" id="reloadTag"></span></div>
   </div>
-  <div class="col mid"><div id="rec"><span id="clock">00:00</span></div><button class="chip" id="gear" type="button">Settings</button></div>
+  <div class="col mid"><div id="rec"><span id="clock">00:00</span><span id="tpen"></span></div><button class="chip" id="gear" type="button">Settings</button></div>
   <div class="col r">
     <div class="chip"><span class="lbl">Hostages</span><b id="hostages">0 / 3</b></div>
     <div class="chip"><span class="lbl">Hostiles</span><b id="hostiles">6</b></div>
   </div>
 </div>
 <div id="fade"></div>
+<div id="execBan" hidden>EXECUTION ORDER · STOP THE LAST SUSPECTS</div>
 <div id="toast"></div>
 <div id="prompt"></div>
 <div id="cut"><span>CUTTING ZIP TIES</span><div class="bar"><i id="cutFill"></i></div></div>
@@ -872,7 +877,7 @@ B.vaultdoor=(g,w,d)=>{
 };
 LEVELS.bank=makeBank;
 LEVEL_INFO.bank={name:'First Mutual Bank',tag:'6:00',desc:'Active robbery. 20 suspects, 5 hostages, a vault drill.',dispatch:'Dispatch 10-31 · Robbery in progress · 5 hostages · vault drill',
- brief:'Armed crew inside First Mutual. You start out front with the patrol units, who are only laying down cover fire. Storm the front doors or loop around to the back alley. A thermite drill will breach the vault in three minutes: shoot it or kick it to pieces before it finishes. Six minutes total before the hostages are executed.'};
+ brief:'Armed crew inside First Mutual. You start out front where seven officers are in a real firefight with five suspects at the windows. Whoever wins the street pushes on: officers rush the drill and help clear the room, suspects dig in around it (and cost you a minute if the drill is already down). Storm the front doors or loop around to the back alley. A thermite drill will breach the vault in three minutes: shoot it or kick it to pieces before it finishes. Six minutes total before the hostages are executed.'};
 
 /* ---------- audio ---------- */
 let AC=null;
@@ -909,7 +914,7 @@ function openDoor(d,fx_,fz,kicked){if(d.open)return;d.open=true;d.kicked=!!kicke
 function resetDoors(){doorInfo.forEach(d=>{d.open=false;d.kicked=false;d.ang=0;d.tgt=0;d.pivot.rotation.y=0;});}
 
 /* ---------- combat ---------- */
-function spawnBullet(x,z,a,owner,dmg){const m=new THREE.Mesh(bulletGeo,owner==='p'?bmP:bmE);m.position.set(x,1,z);m.rotation.y=-a;scene.add(m);bullets.push({x,z,a,sp:owner==='p'?24:15,owner,m,dmg:dmg||9,life:1.3});}
+function spawnBullet(x,z,a,owner,dmg){const m=new THREE.Mesh(bulletGeo,(owner==='p'||owner==='c')?bmP:bmE);m.position.set(x,1,z);m.rotation.y=-a;scene.add(m);bullets.push({x,z,a,sp:owner==='p'?24:owner==='c'?19:15,owner,m,dmg:dmg||9,life:1.3});}
 function setState(e,s){e.state=s;e.path=null;e.pt=0;}
 function goIdle(e){setState(e,'idle');e.walking=false;e.wait=1+Math.random()*2;e.baseH=e.h;e.chat=0;e.visit=null;}
 function goCombat(e,x,z){if(e.state==='dead')return;const was=e.state==='alert';if(!was){setState(e,'alert');e.react=.5*DF.react;e.joinT=0;}e.target={x,z};e.lost=0;if(!was)callAllies(e);}
@@ -931,31 +936,43 @@ function takedownTarget(){
 }
 function startTakedown(e){
  e.grabbed=true;player.vx=0;player.vz=0;
- tk={e,t:0,sx:player.x,sz:player.z,ang:Math.atan2(player.z-e.z,player.x-e.x),ex:e.x,ez:e.z,h:e.h};
+ tk={e,t:0,sx:player.x,sz:player.z,ang:Math.atan2(player.z-e.z,player.x-e.x),ex:e.x,ez:e.z,h:e.h,s1:false,s2:false};
  cutting=null;cutProg=0;$('cut').style.display='none';
 }
+function stabFx(e){for(let i=0;i<3;i++)spark(e.x+(Math.random()-.5)*.3,e.z+(Math.random()-.5)*.3,1.0+Math.random()*.4);noise(.07,.1,700);shake=Math.max(shake,.12);}
 function updateTakedown(dt){
- const e=tk.e;tk.t+=dt;const t=tk.t;
- let push=0,lower=0;
- if(t>1.95){lower=Math.min(1,(t-1.95)/1.15);const s=lower*lower*(3-2*lower);push=.45*s;lower=s;}
+ const e=tk.e;tk.t+=dt;const t=tk.t,HP=Math.PI/2;
+ let lower=0,push=0;
+ if(t>.85){lower=Math.min(1,(t-.85)/.4);lower=lower*lower*(3-2*lower);push=.4*lower;}
  const ux=Math.cos(tk.ang),uz=Math.sin(tk.ang);
  e.x=tk.ex-ux*push;e.z=tk.ez-uz*push;e.h=tk.h;
- const bx=e.x+ux*.62,bz=e.z+uz*.62,k=Math.min(1,t/.35),s=k*k*(3-2*k);
+ const bx=e.x+ux*.6,bz=e.z+uz*.6,k=Math.min(1,t/.22),s=k*k*(3-2*k);
  player.x=tk.sx+(bx-tk.sx)*s;player.z=tk.sz+(bz-tk.sz)*s;
  player.h=Math.atan2(e.z-player.z,e.x-player.x);
  setPose(player);setPose(e);
- e.mesh.rotation.x=(t>.35&&t<1.95)?Math.sin(t*38)*.07*(t<1.2?1:.4):0;
- e.mesh.rotation.z=-1.55*lower;e.mesh.position.y=.18*lower;
- const mx=(player.x+e.x)/2,mz=(player.z+e.z)/2,ang=Math.atan2(e.z-player.z,e.x-player.x);
- grabArm.visible=t>.2&&lower<.7;grabArm.position.set(mx,1.22-.25*lower,mz);grabArm.rotation.y=-ang;
- const ph=((t-1.0)/.3)%1,thr=ph<.4?ph/.4:1-(ph-.4)/.6;
- knife.visible=t>1.0&&t<1.95;
- if(knife.visible){const off=.28+.2*thr;knife.position.set(player.x+Math.cos(ang)*off,1.05,player.z+Math.sin(ang)*off);knife.rotation.y=-ang;setFlash(e.mesh,thr>.85);}
- else setFlash(e.mesh,false);
- player.mesh.rotation.z=-.3*lower;
- if(t>=3.1){
+ let rx=t<.5?Math.sin(t*40)*.06:0;
+ if(t>.54&&t<.66)rx=-.22*(1-(t-.54)/.12);if(t>.76&&t<.88)rx=-.26*(1-(t-.76)/.12);
+ e.mesh.rotation.x=rx;e.mesh.rotation.z=-1.55*lower;e.mesh.position.y=.18*lower;
+ const mx=(player.x+e.x)/2,mz=(player.z+e.z)/2,ang=player.h;
+ grabArm.visible=t>.1&&t<.72;grabArm.position.set(mx,1.3,mz);grabArm.rotation.y=-ang;
+ // knife: drawn, raised overhead, two stabs, sheathed
+ let y=0,off=0,rz=0,vis=true;
+ if(t<.12)vis=false;
+ else if(t<.4){const u=(t-.12)/.28,q=u*u*(3-2*u);y=.85+1.1*q;off=.2+.35*q;rz=-HP*q;}
+ else if(t<.5){y=1.95+Math.sin(t*70)*.02;off=.55;rz=-HP;}
+ else if(t<.58){const u=(t-.5)/.08;y=1.95-.33*u;off=.55+.07*u;rz=-HP;}
+ else if(t<.68){const u=(t-.58)/.1;y=1.62+.3*u;off=.62-.07*u;rz=-HP;}
+ else if(t<.76){const u=(t-.68)/.08;y=1.92-.3*u;off=.55+.07*u;rz=-HP;}
+ else if(t<.92){const u=(t-.76)/.16;y=1.62-.75*u;off=.62-.4*u;rz=-HP*(1-u);}
+ else vis=false;
+ knife.visible=vis;
+ if(vis){knife.position.set(player.x+Math.cos(ang)*off,y,player.z+Math.sin(ang)*off);knife.rotation.set(0,-ang,rz);}
+ if(!tk.s1&&t>=.56){tk.s1=true;stabFx(e);}
+ if(!tk.s2&&t>=.74){tk.s2=true;stabFx(e);}
+ player.mesh.rotation.z=-.15*lower;
+ if(t>=1.25){
   e.state='dead';e.grabbed=false;e.fall=1;e.mesh.rotation.x=0;e.mesh.rotation.z=-1.55;e.mesh.position.y=.18;setFlash(e.mesh,false);
-  killed++;toast('Silent takedown','#5fe28c');
+  killed++;toast('Silent takedown','#5fe28c');deathPenalty(e);
   grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;tk=null;
  }
 }
@@ -964,7 +981,7 @@ function bodyCheck(e){
   const dx=b.x-e.x,dz=b.z-e.z,d=Math.hypot(dx,dz);
   if(d<8&&Math.abs(angDiff(Math.atan2(dz,dx),e.h))<1.1&&los(e.x,e.z,b.x,b.z)){b.found=true;goSus(e,b.x,b.z);return;}}
 }
-function onDeath(e){for(const o of enemies){if(o===e||o.state==='dead'||o.state==='alert')continue;const d=Math.hypot(o.x-e.x,o.z-e.z);if(d<9&&los(o.x,o.z,e.x,e.z))goSus(o,e.x,e.z);}}
+function onDeath(e,by){if(by!=='a')deathPenalty(e);for(const o of enemies){if(o===e||o.state==='dead'||o.state==='alert')continue;const d=Math.hypot(o.x-e.x,o.z-e.z);if(d<9&&los(o.x,o.z,e.x,e.z))goSus(o,e.x,e.z);}}
 function damagePlayer(n){if(player.armor>0){const ab=Math.min(player.armor,n);player.armor-=ab;n-=ab;if(player.armor<=0){player.armor=0;toast('Armor broken','#ff4a3c');}}player.hp=Math.max(0,player.hp-n);shake=Math.max(shake,.15);$('hurt').style.opacity=1;setTimeout(()=>{$('hurt').style.opacity=0;},150);noise(.08,.2,1200);if(player.hp<=0&&state==='play')endGame('lost','Officer down','The suspects are still in control.');}
 function hitEnemy(e,dmg){e.hp-=dmg||50;e.flash=.12;noise(.05,.15,1500);if(e.hp<=0){e.state='dead';killed++;toast('Suspect down',null);onDeath(e);}else goCombat(e,player.x,player.z);}
 function shoot(){
@@ -973,10 +990,10 @@ function shoot(){
  if(w.laser){let bd=.07;for(const e of enemies){if(e.state==='dead')continue;const dx=e.x-player.x,dz=e.z-player.z,dd=Math.hypot(dx,dz);if(dd>14||dd<1)continue;const an=Math.abs(angDiff(Math.atan2(dz,dx),a));if(an<bd&&los(player.x,player.z,e.x,e.z)){bd=an;a=Math.atan2(dz,dx);}}}
  spawnBullet(player.x+Math.cos(player.h)*.9,player.z+Math.sin(player.h)*.9,a,'p',w.dmg);
  const mz=player.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},60);noise(.12,w.sil?.03:.28,3200);
- makeNoise(player.x,player.z,w.sil?9:60);
+ makeNoise(player.x,player.z,w.sil?9:60);shotPenalty(w.sil?9:60);
  if(!w.sil)for(const e of enemies){if(e.state==='dead'||e.state==='alert')continue;const rx=e.x-player.x,rz=e.z-player.z,al=rx*Math.cos(a)+rz*Math.sin(a),pp=Math.abs(-rx*Math.sin(a)+rz*Math.cos(a));if(al>0&&al<14&&pp<1.3&&los(player.x,player.z,e.x,e.z))goCombat(e,player.x,player.z);}
 }
-function startReload(){if(player.reload>0||player.ammo===player.mag)return;player.reload=wpn().rel;noise(.04,.2,6000);makeNoise(player.x,player.z,4);}
+function startReload(){if(player.reload>0||player.ammo===player.mag)return;if(player.spare<=0){if(player.ammo<=0)noAmmoHint();return;}player.reload=wpn().rel;noise(.04,.2,6000);makeNoise(player.x,player.z,4);}
 function nearWindow(){let best=null,bd=9;
  for(const k in wins){const w=wins[k];if(w.broken)continue;const dx=w.x+.5-player.x,dz=w.y+.5-player.z,dist=Math.hypot(dx,dz);if(dist>1.5)continue;
   if((dx*Math.cos(player.h)+dz*Math.sin(player.h))/Math.max(dist,.01)<.35)continue;if(dist<bd){bd=dist;best=w;}}
@@ -999,7 +1016,7 @@ function kick(){
  for(const e of enemies){if(e.state==='dead')continue;const dd=Math.hypot(e.x-best.x-.5,e.z-best.y-.5);if(dd<1.8)e.stun=1.2;}
  makeNoise(best.x+.5,best.y+.5,16);
 }
-function nearHostage(){for(const h of hostages){if(h.free)continue;const dx=h.x-player.x,dz=h.z-player.z;if(Math.hypot(dx,dz)<1.5&&Math.abs(angDiff(Math.atan2(dz,dx),player.h))<1.3)return h;}return null;}
+function nearHostage(){for(const h of hostages){if(h.free||h.dead||h.gone)continue;const dx=h.x-player.x,dz=h.z-player.z;if(Math.hypot(dx,dz)<1.5&&Math.abs(angDiff(Math.atan2(dz,dx),player.h))<1.3)return h;}return null;}
 
 /* ---------- enemy AI ---------- */
 function followPath(e,dt,speed){
@@ -1026,6 +1043,8 @@ function updateEnemy(e,dt){
  if(e.state==='dead'){e.fall=Math.min(1,(e.fall||0)+dt*3);e.mesh.rotation.z=-1.55*e.fall;e.mesh.position.y=.18*e.fall;return;}
  e.cool=(e.cool||0)-dt;e.stun=(e.stun||0)-dt;e.flash=(e.flash||0)-dt;if(!e.grabbed)setFlash(e.mesh,e.flash>0);
  if(e.grabbed)return;
+ if(e.exec){updateExecEnemy(e,dt);return;}
+ if(e.fight||e.guard){if(updateFightEnemy(e,dt))return;}
  if(e.joinT>0){e.joinT-=dt;if(e.joinT<=0)goCombat(e,player.x,player.z);}
  const dx=player.x-e.x,dz=player.z-e.z,d=Math.hypot(dx,dz),toP=Math.atan2(dz,dx);
  const cm=player.crouch?.7:1,near=player.crouch?.8:1.6;
@@ -1103,8 +1122,14 @@ function updateBullets(dt){
    if(b.owner==='p'){
     for(const e of enemies)if(e.state!=='dead'&&(e.x-b.x)**2+(e.z-b.z)**2<.16){hitEnemy(e,b.dmg);dead=true;spark(b.x,b.z);break;}
     if(dead)break;
-    for(const h of hostages)if((h.x-b.x)**2+(h.z-b.z)**2<.12){dead=true;if(state==='play')endGame('lost','Hostage hit','A round struck a hostage. Check your lane before you fire.');break;}
+    for(const h of hostages)if(!h.dead&&!h.gone&&(h.x-b.x)**2+(h.z-b.z)**2<.12){dead=true;if(state==='play')killHostage(h,'player');break;}
+   }else if(b.owner==='c'){
+    for(const e of enemies)if(e.state!=='dead'&&(e.x-b.x)**2+(e.z-b.z)**2<.16){copHit(e,b.dmg,b.x-Math.cos(b.a)*6,b.z-Math.sin(b.a)*6);dead=true;spark(b.x,b.z);break;}
    }else if((player.x-b.x)**2+(player.z-b.z)**2<.14){damagePlayer(b.dmg);dead=true;}
+   else{
+    for(const c of COPS)if(!c.dead&&(c.x-b.x)**2+(c.z-b.z)**2<.16){copDamage(c,b.cd||b.dmg*2);dead=true;break;}
+    if(!dead)for(const h of hostages)if(!h.dead&&!h.gone&&(h.x-b.x)**2+(h.z-b.z)**2<.12){hostageHit(h);dead=true;break;}
+   }
   }
   b.life-=dt;
   if(dead||b.life<=0){scene.remove(b.m);bullets.splice(i,1);}else{b.m.position.set(b.x,1,b.z);}
@@ -1119,9 +1144,10 @@ function reset(){
  resetDrill();EN.saved=-1;EN.on=false;applyLoadout();hostages.forEach(h=>{h.gone=false;});tk=null;grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;player.mesh.scale.y=1;
  const sp=L.spawn;
  Object.assign(player,{crouch:false,cr:0,noiseLvl:0,stepT:0,stairCd:0,x:sp.x,z:sp.z,h:sp.h,hp:100,ammo:wpn().mag,mag:wpn().mag,armor:GEAR.armor>0?GEAR.armor:0,reload:0,cool:0,sp:0,vx:0,vz:0,push:0});
- enemies.forEach((e,i)=>{const d=L.enemyDefs[i];Object.assign(e,{x:d[0],z:d[1],h:d[2],hp:100,state:'idle',walking:false,wait:Math.random()*2+.5,chat:0,visit:null,shout:0,susT:0,look:0,arrived:false,joinT:0,faceT:0,iconT:0,burst:0,dodgeT:0,cool:0,stun:0,flash:0,fall:0,path:null,target:null,lost:0,react:0});e.mesh.rotation.z=0;e.mesh.rotation.x=0;e.grabbed=false;e.found=false;setState(e,'idle');setFlash(e.mesh,false);setPose(e);});
+ enemies.forEach((e,i)=>{const d=L.enemyDefs[i];Object.assign(e,{x:d[0],z:d[1],h:d[2],hp:100,state:'idle',walking:false,wait:Math.random()*2+.5,chat:0,visit:null,shout:0,susT:0,look:0,arrived:false,joinT:0,faceT:0,iconT:0,burst:0,exec:false,fight:false,guard:false,dodgeT:0,cool:0,stun:0,flash:0,fall:0,path:null,target:null,lost:0,react:0});e.mesh.rotation.z=0;e.mesh.rotation.x=0;e.grabbed=false;e.found=false;setState(e,'idle');setFlash(e.mesh,false);setPose(e);});
  hostages.forEach((h,i)=>{const d=L.hostageDefs[i];h.free=false;h.x=d[0];h.z=d[1];h.ring.material.color.setHex(0xffbf3c);setPose(h);h.mesh.position.y=-.12;});
  bullets.forEach(b=>scene.remove(b.m));bullets.length=0;resetDoors();killed=0;playTime=0;cutting=null;cutProg=0;timeLeft=L.timeLimit;
+ player.spare=spareMax();resetHostages();resetCops();pickFightEnemies();
  cam.x=player.x;cam.z=player.z;
 }
 function scaleEnemies(){
@@ -1149,7 +1175,7 @@ function endGame(mode,title,sub){
  const t=Math.floor(playTime),mm=String(Math.floor(t/60)).padStart(2,'0'),ss=String(t%60).padStart(2,'0');
  const pay=payout(mode==='won');
  if(mode==='won'&&BD.cur){BD.list=BD.list.filter(m=>m.id!==BD.cur.id);if(BD.sel===BD.cur.id)BD.sel=BD.list.length?BD.list[0].id:null;}
- $('endStats').innerHTML=sub+'<br>Difficulty: '+DF.name+'<br>Hostages freed: '+rescued+' / '+hostages.length+'<br>Suspects down: '+killed+' / '+enemies.length+'<br>Time: '+mm+':'+ss+(pay?'<br><br>Client: '+pay.client+'<br>'+(mode==='won'?'Contract: '+money(pay.base)+'<br>':'Contract failed — half bonus only<br>')+'Suspects ('+pay.nk+'): '+money(pay.kills)+'<br>Hostages saved ('+pay.ns+'): '+money(pay.saved)+'<br><b style="color:var(--green)">Earned: '+money(pay.total)+'</b> · Bank: '+money(CASH):'')+(GEAR.armor===0?'<br><span style="color:var(--red)">Armor broken — repair it in the Armory.</span>':'');
+ $('endStats').innerHTML=sub+'<br>Difficulty: '+DF.name+'<br>Hostages freed: '+rescued+' / '+hostages.length+(hDead?' · lost '+hDead:'')+'<br>Suspects down: '+killed+' / '+enemies.length+'<br>Time: '+mm+':'+ss+(pay?'<br><br>Client: '+pay.client+'<br>'+(mode==='won'?'Contract: '+money(pay.base)+'<br>':'Contract failed — half bonus only<br>')+'Suspects ('+pay.nk+'): '+money(pay.kills)+'<br>Hostages saved ('+pay.ns+'): '+money(pay.saved)+(pay.cut?'<br><span style="color:var(--red)">Hostage casualty penalty: −'+money(pay.cut)+'</span>':'')+'<br><b style="color:var(--green)">Earned: '+money(pay.total)+'</b> · Bank: '+money(CASH):'')+(GEAR.armor===0?'<br><span style="color:var(--red)">Armor broken — repair it in the Armory.</span>':'');
 }
 function startGame(){audio();reset();state='play';$('hud').hidden=false;$('screen').hidden=true;$('hint').hidden=false;$('hint').style.opacity=1;setTimeout(()=>{$('hint').style.opacity=0;},9000);
  updateTouch();if(touchOn())$('hint').hidden=true;}
@@ -1554,7 +1580,7 @@ function payFor(m,kills,saved,won){
  const c=CLIENTS[m.client],k=DPAY[m.diff]*c.m,base=won?BPAY[m.type]*k:0,kp=kills*200*k,hp=saved*1200*k,f=won?1:.5;
  return {client:c.n,base:Math.round(base),kills:Math.round(kp*f),saved:Math.round(hp*f),total:Math.round(base+(kp+hp)*f)};
 }
-function payout(won){const m=BD.cur;if(!m)return null;const rescued=savedN(),p=payFor(m,killed,rescued,won);p.nk=killed;p.ns=rescued;CASH+=p.total;saveCash();return p;}
+function payout(won){const m=BD.cur;if(!m)return null;const rescued=savedN(),p=payFor(m,killed,rescued,won);p.nk=killed;p.ns=rescued;p.cut=0;if(hPen>0){p.cut=Math.round(p.total*Math.min(.75,.25*hPen));p.total-=p.cut;}CASH+=p.total;saveCash();return p;}
 const BD={list:[],sel:null,t:4.2,uid:0,open:false,built:false,fresh:{}};
 function mmss(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 function boardMapSVG(){
@@ -1659,6 +1685,7 @@ function fbiSetup(){
 function runSetup(){
  const sp=L.entry||L.spawn;enSub('Suspects down. Hostages are running out…');
  for(const h of hostages){
+  if(h.dead||h.gone)continue;h.esc=false;
   h.free=true;h.ring.material.color.setHex(0x5fe28c);h.mesh.position.y=0;h.r=.28;h.gone=false;h.path=null;h.pt=0;h.delay=Math.random()*.9;
   const f=flr(h.z);let tg={x:sp.x,z:sp.z};
   if(f!==flr(sp.z)&&L.stairs&&L.stairs.length){let best=1e9;for(const s of L.stairs)for(const r of [s.a,s.b]){if(flr(r.y+.5)!==f)continue;const cx=r.x+r.w/2,cz=r.y+r.h/2,d=Math.hypot(cx-h.x,cz-h.z);if(d<best){best=d;tg={x:cx,z:cz};}}}
@@ -1823,7 +1850,7 @@ function spawnAllies(){
 }
 function allyHit(e,n){
  if(e.state==='dead')return;e.hp-=n;e.flash=.12;noise(.04,.1,1600);spark(e.x,e.z,1.1);
- if(e.hp<=0){e.state='dead';e.fall=0;e.path=null;onDeath(e);}else goCombat(e,player.x,player.z);
+ if(e.hp<=0){e.state='dead';e.fall=0;e.path=null;onDeath(e,'a');}else goCombat(e,player.x,player.z);
 }
 function updateAllies(dt){
  for(const a of ALLY){
@@ -1840,44 +1867,269 @@ function updateAllies(dt){
  }
 }
 
-/* ---------- ambient firefight outside the bank (visual only, zero damage) ---------- */
-let COPS=[],AMB=[],ambT=0,ambSnd=0;
-function clearCops(){for(const c of COPS)scene.remove(c.mesh);for(const t of AMB)scene.remove(t.m);COPS=[];AMB=[];}
+/* ---------- the street fight outside the bank: real bullets, real deaths ---------- */
+let COPS=[],FIGHT={res:'',t:0,snd:0};
+function clearCops(){for(const c of COPS)scene.remove(c.mesh);COPS=[];FIGHT={res:'',t:0,snd:0};}
+function freeNear(x,z,minz,maxz){for(let r=0;r<7;r+=.5)for(let k=0;k<12;k++){const a=k*.5236,px=x+Math.cos(a)*r,pz=z+Math.sin(a)*r;if(pz>=(minz||0)&&pz<=(maxz||999)&&!collides(px,pz,.34))return [px,pz];}return [x,z];}
 function spawnCops(){
  if(!L.copDefs)return;
- COPS=L.copDefs.map((d,i)=>{const mesh=makePerson({shirt:0x1d3557,vest:0x0e1626,pants:0x14213d,skin:0xd9a27a,hat:'cap',armed:true});
-  const c={x:d[0],z:d[1],h:-Math.PI/2,r:.28,mesh,cd:Math.random()*2.5,burst:0,bt:0,duck:0,seed:i*1.9};setPose(c);return c;});
+ const pick=[0,2,3,4,6,9,7];
+ COPS=pick.map((di,i)=>{const d=L.copDefs[di],sp=freeNear(d[0],d[1],29.8,40);
+  const mesh=makePerson({shirt:0x1d3557,vest:0x0e1626,pants:0x14213d,skin:0xd9a27a,hat:'cap',armed:true});
+  const c={hx:sp[0],hz:sp[1],x:sp[0],z:sp[1],h:-Math.PI/2,r:.28,mesh,seed:i*1.9,anim:0};setPose(c);return c;});
+ resetCops();
 }
-function ambTracer(x,z,tx,tz,enemy){
- const a=Math.atan2(tz-z,tx-x),m=new THREE.Mesh(bulletGeo,enemy?bmE:bmP);m.position.set(x,1.05,z);m.rotation.y=-a;scene.add(m);
- AMB.push({m,x,z,a,tx,tz,d:Math.hypot(tx-x,tz-z)});
+function resetCops(){
+ FIGHT={res:'',t:0,snd:0};
+ for(const c of COPS){Object.assign(c,{x:c.hx,z:c.hz,h:-Math.PI/2,hp:70,dead:false,fall:0,cd:.4+Math.random()*1.2,burst:0,bt:0,duck:0,sd:0,sT:0,mode:'fight',kick:0,path:null,pt:0,target:null,tg:null,tgT:0});
+  c.mesh.rotation.z=0;c.mesh.position.y=0;c.mesh.scale.y=1;setPose(c);}
+}
+function pickFightEnemies(){
+ enemies.forEach(e=>{e.fight=false;e.guard=false;e.exec=false;});
+ if(!L.copDefs)return;
+ const cand=enemies.filter(e=>e.homeZ>=23).sort((a,b)=>b.homeZ-a.homeZ).slice(0,5);
+ cand.forEach(e=>{e.fight=true;setState(e,'alert');e.react=0;e.px=null;e.hold=0;e.jit=0;e.ft=null;e.ftT=0;e.cool=.5+Math.random();});
+}
+function fightSnd(x,z,f){if(FIGHT.snd>0)return;if(Math.hypot(x-player.x,z-player.z)<26){FIGHT.snd=.07;noise(.05,.08,f);}}
+function copDamage(c,n){if(c.dead)return;c.hp-=n;spark(c.x,c.z,1.1);if(c.hp<=0){c.dead=true;c.fall=0;noise(.06,.18,800);}}
+function copHit(e,n,x,z){
+ if(e.state==='dead')return;e.hp-=n;e.flash=.12;spark(e.x,e.z,1.1);
+ if(e.hp<=0){e.state='dead';e.fall=0;e.path=null;e.fight=false;e.guard=false;e.exec=false;onDeath(e,'a');}
+ else if(!e.fight&&!e.exec&&e.state!=='alert')goCombat(e,x,z);
+}
+function copFire(c,tx,tz,spread){
+ const a=Math.atan2(tz-c.z,tx-c.x)+(Math.random()-.5)*(spread||.14);
+ spawnBullet(c.x+Math.cos(a)*.9,c.z+Math.sin(a)*.9,a,'c',34);
+ const mz=c.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},45);fightSnd(c.x,c.z,2600);
+}
+function copTarget(c){
+ let best=null,bs=1e9;
+ for(const e of enemies){if(e.state==='dead')continue;if(c.mode==='fight'&&!e.fight)continue;
+  const d=Math.hypot(e.x-c.x,e.z-c.z);if(d>30)continue;const s=d+(los(c.x,c.z,e.x,e.z)?0:12);if(s<bs){bs=s;best=e;}}
+ return best;
+}
+function findLane(e,tx,tz,range,bx,lim,ez){
+ ez=ez==null?e.z:ez;for(let k=0;k<=range*2;k++){const off=((k+1)>>1)*(k&1?1:-1)*.5*(k===0?0:1);const x=e.x+off;
+  if(lim!=null&&Math.abs(x-bx)>lim)continue;
+  if(L.inside&&e.inOnly&&!L.inside(x,ez))continue;
+  if(collides(x,ez,.3))continue;
+  if(los(x,ez,tx,tz))return x;}
+ return null;
+}
+function copGun(c,tg,vis,dt){
+ const a=Math.atan2(tg.z-c.z,tg.x-c.x);c.h=turnToward(c.h,a,dt*10);
+ if(c.burst>0){c.bt-=dt;if(c.bt<=0){c.bt=.13;c.burst--;copFire(c,tg.x,tg.z,.16);if(c.burst===0&&c.mode==='fight'&&Math.random()<.45)c.duck=.8;}}
+ else if(c.cd<=0&&Math.abs(angDiff(a,c.h))<.3&&(vis||Math.random()<.25)){c.burst=1+((Math.random()*3)|0);c.bt=0;c.cd=.8+Math.random()*1.5;}
 }
 function updateCops(dt){
  if(!COPS.length)return;
- ambSnd-=dt;
- const pl=player;
- for(const c of COPS){
-  if(c.duck>0){c.duck-=dt;c.mesh.scale.y=.72;}else c.mesh.scale.y=1;
-  c.cd-=dt;
-  if(c.burst>0){c.bt-=dt;
-   if(c.bt<=0){c.bt=.13;c.burst--;
-    const tx=6+Math.random()*34,tz=29.1,a=Math.atan2(tz-c.z,tx-c.x);c.h=a;
-    ambTracer(c.x+Math.cos(a)*.9,c.z+Math.sin(a)*.9,tx,tz,false);
-    const mz=c.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},45);
-    if(ambSnd<=0&&Math.hypot(c.x-pl.x,c.z-pl.z)<24){ambSnd=.08;noise(.05,.07,2600);}
-    if(c.burst===0&&Math.random()<.3)c.duck=.9;}
-  }else if(c.cd<=0){c.burst=1+((Math.random()*3)|0);c.bt=0;c.cd=.9+Math.random()*2.6;}
-  c.h=c.h;setPose(c);c.mesh.visible=canSee(c.x,c.z);
+ FIGHT.snd-=dt;FIGHT.t+=dt;
+ let fb=enemies.filter(e=>e.fight&&e.state!=='dead'),ac=COPS.filter(c=>!c.dead);
+ if(!FIGHT.res&&state==='play'&&FIGHT.t>1){
+  if(FIGHT.t>70&&fb.length&&ac.length){if(ac.length>=fb.length){fb.forEach(e=>{e.fight=false;goCombat(e,player.x,player.z);});}else{ac.forEach(c=>{c.hp=0;c.dead=true;c.fall=0;});}fb=enemies.filter(e=>e.fight&&e.state!=='dead');ac=COPS.filter(c=>!c.dead);}
+  if(!fb.length){FIGHT.res='cops';toast('Cops took the street — pushing inside','#5fe28c');for(const c of ac){c.mode='push';c.path=null;c.tg=null;}}
+  else if(!ac.length){
+   FIGHT.res='bandits';
+   if(DR&&!DR.alive)timePenalty(60,'Suspects won the street  −1:00');else toast('Suspects won the street — they dig in','#ff4a3c');
+   fb.forEach((e,i)=>{e.fight=false;if(DR&&DR.alive){e.guard=true;const p=freeNear(DR.x-2.6+i*1.3,DR.z+2.4,8,26);e.post={x:p[0],z:p[1]};e.path=null;}else{goIdle(e);}});
+  }
  }
- // suspects firing back out of the front windows
- ambT-=dt;
- if(ambT<=0){ambT=.7+Math.random()*1.5;const ws=L.windows.filter(w=>w[1]>28&&w[1]<29);
-  if(ws.length){const w=ws[(Math.random()*ws.length)|0],c=COPS[(Math.random()*COPS.length)|0];
-   ambTracer(w[0],29.0,c.x+(Math.random()-.5)*1.2,c.z+(Math.random()-.5)*1.2,true);
-   if(ambSnd<=0&&Math.hypot(w[0]-pl.x,29-pl.z)<24){ambSnd=.08;noise(.05,.08,1800);}}}
- for(let i=AMB.length-1;i>=0;i--){const t=AMB[i];const s=26*dt;t.x+=Math.cos(t.a)*s;t.z+=Math.sin(t.a)*s;t.d-=s;t.m.position.x=t.x;t.m.position.z=t.z;
-  t.m.visible=canSee(t.x,t.z);
-  if(t.d<=0){spark(t.tx,t.tz,1.0);scene.remove(t.m);AMB.splice(i,1);}}
+ for(const c of COPS){
+  if(c.dead){c.fall=Math.min(1,c.fall+dt*3);c.mesh.rotation.z=-1.55*c.fall;c.mesh.position.y=.18*c.fall;c.mesh.visible=canSee(c.x,c.z);continue;}
+  c.cd-=dt;c.sT-=dt;let v=0;
+  if(c.duck>0){c.duck-=dt;c.mesh.scale.y=.74;}else c.mesh.scale.y=1;
+  c.tgT-=dt;if(c.tgT<=0||!c.tg||c.tg.state==='dead'){c.tgT=.5;c.tg=copTarget(c);}
+  const tg=c.tg;let vis=false,d=99;
+  if(tg){d=Math.hypot(tg.x-c.x,tg.z-c.z);vis=los(c.x,c.z,tg.x,tg.z);}
+  if(c.mode==='fight'){
+   if(tg&&d<28)copGun(c,tg,vis,dt);
+   c.laneT=(c.laneT||0)-dt;
+   if(tg&&!vis){if(c.laneT<=0){c.laneT=.6;c.lane=findLane(c,tg.x,tg.z,10,c.hx,10,29.5);}}else c.lane=null;
+   {const zd=(tg&&!vis)?29.5:c.hz;const dz=zd-c.z;if(Math.abs(dz)>.1)moveEnt(c,0,Math.sign(dz)*1.8*dt);}
+   if(c.lane!=null){c.sd=Math.abs(c.lane-c.x)<.3?0:Math.sign(c.lane-c.x);}
+   else if(c.sT<=0){c.sT=.7+Math.random()*1.4;c.sd=[-1,0,0,1][(Math.random()*4)|0];}
+   const dx=c.sd*(c.lane!=null?2.6:1.9)*dt;if(Math.abs(c.x+dx-c.hx)<(c.lane!=null?10.2:3.2)){const x0=c.x;moveEnt(c,dx,0);v=Math.abs(c.x-x0)/dt;if(c.sd&&v<.6){c.sd=-c.sd;c.sT=.5;c.lane=null;}}
+  }else{
+   if(tg&&vis&&d<11)copGun(c,tg,vis,dt);
+   else if(DR&&DR.alive){
+    const gx=DR.x+(((c.seed*3)|0)%3-1)*.8,gz=DR.z+1.5;
+    if(Math.hypot(gx-c.x,gz-c.z)<1.1){c.h=turnToward(c.h,Math.atan2(DR.z-c.z,DR.x-c.x),dt*12);c.kick-=dt;if(c.kick<=0){c.kick=.65;damageDrill(110);}}
+    else{c.target={x:gx,z:gz};v=followPath(c,dt,3.6);}
+   }else if(tg){c.target={x:tg.x,z:tg.z};v=followPath(c,dt,3.3);}
+  }
+  legs(c,v,dt);setPose(c);c.mesh.visible=canSee(c.x,c.z);
+ }
+ // suspects inside who are alert hurt the officers pushing in
+ for(const e of enemies){if(e.state!=='alert'||e.fight||e.exec)continue;let bc=null,bd=8;
+  for(const c of ac){if(c.dead||c.mode!=='push')continue;const d=Math.hypot(e.x-c.x,e.z-c.z);if(d<bd&&los(e.x,e.z,c.x,c.z)){bd=d;bc=c;}}
+  if(bc){bc.hp-=dt*(e.smg?9:6);if(bc.hp<=0&&!bc.dead){bc.dead=true;bc.fall=0;noise(.06,.18,800);}}}
+}
+function fightTarget(e){
+ let best=null,bs=1e9;
+ for(const c of COPS){if(c.dead)continue;const d=Math.hypot(c.x-e.x,c.z-e.z);if(d>28)continue;const v=los(e.x,e.z,c.x,c.z),s=d+(v?0:14);if(s<bs){bs=s;best={x:c.x,z:c.z,vis:v,d};}}
+ const dp=Math.hypot(player.x-e.x,player.z-e.z);
+ if(dp<16&&los(e.x,e.z,player.x,player.z)&&dp<bs){best={x:player.x,z:player.z,vis:true,d:dp};}
+ return best;
+}
+function fightPosts(){
+ if(FIGHT.posts)return FIGHT.posts;const arr=[];
+ for(const k in wins){const w=wins[k];if(w.y===28&&!collides(w.x+.5,26.9,.28))arr.push(w.x+.5);}
+ for(const k in doors){const d=doors[k];if(d.y===28&&!collides(d.x+.5,26.9,.28))arr.push(d.x+.5);}
+ return FIGHT.posts=arr;
+}
+function pickPost(e){
+ const ps=fightPosts();if(!ps.length)return e.x;
+ const tg=[];for(const c of COPS)if(!c.dead)tg.push(c);
+ const sc=[];
+ for(const p of ps){let seen=false,nd=99;for(const c of tg){const d=Math.hypot(c.x-p,c.z-26.9);if(d<28&&los(p,26.9,c.x,c.z)){seen=true;if(d<nd)nd=d;}}
+  let s=Math.abs(p-e.x)+(seen?0:30);
+  for(const o of enemies)if(o!==e&&o.fight&&o.state!=='dead'&&Math.abs((o.px==null?o.x:o.px)-p)<.9)s+=5;
+  sc.push([s+Math.random()*2.5,p]);}
+ sc.sort((a,b)=>a[0]-b[0]);return sc[0][1];
+}
+// returns true when this suspect is fully handled by the fight / guard logic this frame
+function updateFightEnemy(e,dt){
+ if(e.guard){
+  if(!DR||!DR.alive){e.guard=false;goIdle(e);return false;}
+  if(Math.hypot(player.x-e.x,player.z-e.z)<13&&los(e.x,e.z,player.x,player.z)){e.guard=false;goCombat(e,player.x,player.z);return false;}
+  const t=e.post;let v=0;
+  if(Math.hypot(t.x-e.x,t.z-e.z)>.8){e.target=t;v=followPath(e,dt,3.6);}else e.h=turnToward(e.h,Math.PI/2,dt*4);
+  legs(e,v,dt);setPose(e);return true;
+ }
+ e.ftT-=dt;if(e.ftT<=0||!e.ft){e.ftT=.4;e.ft=fightTarget(e);}
+ const t=e.ft;let v=0;
+ e.hold=(e.hold||0)-dt;
+ if(e.hold<=0||e.px==null){e.hold=1.6+Math.random()*2.2;e.px=pickPost(e);}
+ {const x0=e.x,z0=e.z,sp=e.smg?3.2:2.8,tx=e.px+(e.jit||0),tz=26.9,dx=tx-e.x,dz=tz-e.z,d=Math.hypot(dx,dz);
+  if(d>.15){moveEnt(e,dx/d*sp*dt,0);moveEnt(e,0,dz/d*sp*dt);}
+  else{e.jt=(e.jt||0)-dt;if(e.jt<=0){e.jt=.5+Math.random()*.8;e.jit=(Math.random()-.5)*.8;}}
+  for(const o of enemies){if(o!==e&&o.fight&&o.state!=='dead'&&Math.abs(o.x-e.x)<.55&&Math.abs(o.z-e.z)<.55){moveEnt(e,(e.x<o.x?-1:1)*1.2*dt,0);}}
+  v=Math.hypot(e.x-x0,e.z-z0)/dt;}
+ if(t){const a=Math.atan2(t.z-e.z,t.x-e.x);e.h=turnToward(e.h,a,dt*13);
+  if(e.cool<=0&&Math.abs(angDiff(a,e.h))<.3&&(t.vis||Math.random()<.04)){
+   const a2=a+(Math.random()-.5)*(.1+t.d*.006);
+   spawnBullet(e.x+Math.cos(e.h)*.9,e.z+Math.sin(e.h)*.9,a2,'e',(e.smg?4:14)*DF.dmg);
+   bullets[bullets.length-1].cd=e.smg?10:26;
+   if(e.smg){e.burst=(e.burst||0)+1;if(e.burst>=6){e.burst=0;e.cool=.7+Math.random()*.6;}else e.cool=.1;}else e.cool=.5+Math.random()*.5;
+   const mz=e.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},50);fightSnd(e.x,e.z,1900);}}
+ legs(e,v,dt);setPose(e);return true;
+}
+
+/* ---------- time penalties, ammo, hostages, execution order ---------- */
+let tpAcc=0,tpT=0,hDead=0,hPen=0,EXEC={on:false,t:0},hintT=-9,restockOn=false;
+function timePenalty(s,why){
+ if(state!=='play'||s<=0)return;
+ timeLeft-=s;tpAcc=tpT>0?tpAcc+s:s;tpT=1.8;
+ const el=$('tpen');el.textContent='−'+(tpAcc>=60?fmtT(tpAcc):tpAcc+'s');el.className='show';
+ const r=$('rec');r.classList.remove('hit');void r.offsetWidth;r.classList.add('hit');
+ if(why)toast(why,'#ff4a3c');
+}
+function shotPenalty(r){
+ let n=0;const f0=flr(player.z),rr=Math.min(r,32);
+ for(const e of enemies){if(e.state==='dead'||e.fight||e.grabbed||flr(e.z)!==f0)continue;
+  const d=Math.hypot(e.x-player.x,e.z-player.z),eff=los(e.x,e.z,player.x,player.z)?d:d*1.7;if(eff<rr)n++;}
+ if(n>2)timePenalty(1);
+}
+function deathPenalty(e){
+ for(const o of enemies){if(o===e||o.state==='dead'||o.grabbed||flr(o.z)!==flr(e.z))continue;
+  if(Math.hypot(o.x-e.x,o.z-e.z)<11&&los(o.x,o.z,e.x,e.z)){timePenalty(5,'Death noticed  −5s');return;}}
+}
+function spareMax(){return wpn().mag*5;}
+function noAmmoHint(){if(time-hintT>2.2){hintT=time;toast('Out of ammo — restock at your cruiser','#ff4a3c');}}
+function resetHostages(){
+ hDead=0;hPen=0;EXEC={on:false,t:0};tpAcc=0;tpT=0;restockOn=false;
+ hostages.forEach(h=>{h.hits=0;h.dead=false;h.esc=false;h.gone=false;h.flash=0;h.r=.28;h.mesh.rotation.z=0;h.mesh.rotation.x=0;h.ring.visible=true;h.ring.material.color.setHex(0xffbf3c);h.target=null;h.path=null;h.out=null;setFlash(h.mesh,false);});
+ const b=$('execBan');if(b)b.hidden=true;const el=$('tpen');if(el)el.className='';
+}
+function killHostage(h,by){
+ if(h.dead||h.gone)return;
+ h.dead=true;h.free=false;h.esc=false;hDead++;h.ring.visible=false;h.mesh.position.y=.18;
+ noise(.14,.28,900);spark(h.x,h.z,1.1);spark(h.x+.2,h.z,.8);
+ if(by==='player')hPen++;
+ toast('Hostage lost  '+hDead+' / 3 allowed','#ff4a3c');
+ introSay(by==='player'?"Damn it! Watch your fire. That was a civilian!":by==='exec'?"They're executing the hostages! Stop them!":"We lost a hostage! Keep it together!");
+ if(state!=='play')return;
+ if(hDead>3)endGame('lost','Too many hostages lost','Four hostages died on your watch.');
+ else if(EXEC.on&&!hostages.some(x=>!x.dead&&!x.free&&!x.gone))endGame('lost','Hostages executed','The crew carried out the order before you could stop them.');
+ else if(hostages.every(x=>x.dead))endGame('lost','No hostages left','Every hostage was lost.');
+}
+function hostageHit(h){
+ if(h.dead||h.gone)return;h.hits++;h.flash=.15;spark(h.x,h.z,1.1);
+ if(h.hits>=3)killHostage(h,'enemy');else toast('Hostage hit  '+h.hits+' / 3','#ffbf3c');
+}
+function outsideTile(x,y){
+ if(L.inside)return !L.inside(x+.5,y+.5);
+ if(x<0||y<0||x>=W||y>=H)return true;return kind&&kind[y]&&kind[y][x]===9;
+}
+function startEscape(h){
+ h.r=.28;h.mesh.position.y=0;h.path=null;h.pt=0;h.out=null;h.win=null;
+ const f=flr(h.z),en=L.entry||L.spawn,hx=Math.floor(h.x),hz=Math.floor(h.z);
+ let best=null,bl=1e9;
+ let tg={x:en.x,z:en.z};
+ if(f!==flr(en.z)&&L.stairs&&L.stairs.length){let bd=1e9;for(const s of L.stairs)for(const r of [s.a,s.b]){if(flr(r.y+.5)!==f)continue;const cx=r.x+r.w/2,cz=r.y+r.h/2,d=Math.hypot(cx-h.x,cz-h.z);if(d<bd){bd=d;tg={x:cx,z:cz};}}}
+ const p=bfs(hx,hz,Math.floor(tg.x),Math.floor(tg.z));
+ if(p&&p.length){best={tg,win:null};bl=p.length;}
+ for(const k in wins){const w=wins[k];if(flr(w.y+.5)!==f)continue;
+  for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+   const ix=w.x-dx,iz=w.y-dz,ox=w.x+dx,oz=w.y+dz;
+   if(!passable(ix,iz)||!outsideTile(ox,oz)||outsideTile(ix,iz))continue;
+   if(Math.hypot(ix+.5-h.x,iz+.5-h.z)>bl)continue;
+   const q=bfs(hx,hz,ix,iz);if(!q||!q.length)continue;
+   if(q.length+1<bl){bl=q.length+1;best={tg:{x:ix+.5,z:iz+.5},win:w,dx,dz};}}}
+ if(!best){h.esc=false;return;}
+ h.esc=true;h.target=best.tg;h.win=best.win;h.wd=best.win?{dx:best.dx,dz:best.dz}:null;
+}
+function updateHostages(dt){
+ const en=L.entry||L.spawn;
+ for(const h of hostages){
+  h.flash=(h.flash||0)-dt;if(!h.dead)setFlash(h.mesh,h.flash>0);
+  if(h.dead){h.mesh.rotation.z=-1.55;h.mesh.position.y=.18;continue;}
+  if(!h.esc||h.gone)continue;
+  if(h.out){ // climbing out through a smashed window
+   const dx=h.out.x-h.x,dz=h.out.z-h.z,d=Math.hypot(dx,dz);
+   h.h=turnToward(h.h,Math.atan2(dz,dx),dt*10);moveEnt(h,dx/d*3.2*dt,dz/d*3.2*dt);legs(h,3.2,dt);setPose(h);
+   if(d<.3){h.gone=true;h.esc=false;}continue;}
+  const d=Math.hypot(h.x-h.target.x,h.z-h.target.z);
+  if(h.win){
+   if(d<.7){breakWindow(h.win,false,false);h.out={x:h.win.x+.5+h.wd.dx*.15,z:h.win.y+.5+h.wd.dz*.15};h.win=null;continue;}
+  }else if(d<1.4){h.gone=true;h.esc=false;continue;}
+  const v=followPath(h,dt,4.8);legs(h,v,dt);setPose(h);
+  if(v===0&&d>1.4){h.stuck=(h.stuck||0)+dt;if(h.stuck>2){h.stuck=0;h.path=null;h.pt=0;}}
+ }
+}
+function startExec(){
+ const al=enemies.filter(e=>e.state!=='dead');if(!al.length)return;
+ EXEC={on:true,t:0};
+ toast("They're executing the hostages!",'#ff4a3c');
+ introSay("The last ones are killing the hostages! Get in there!");
+ shake=Math.max(shake,.5);
+ hostages.forEach(h=>{if(!h.dead&&!h.free&&!h.gone)h.ring.material.color.setHex(0xff4a3c);});
+ al.forEach(e=>{e.exec=true;e.fight=false;e.guard=false;setState(e,'alert');e.xdelay=.7+Math.random()*1.3;e.xs=0;});
+ const b=$('execBan');if(b)b.hidden=false;
+}
+function checkExec(dt){
+ if(state!=='play')return;
+ tpT-=dt;if(tpT<=0&&tpAcc){tpAcc=0;$('tpen').className='';}
+ if(EXEC.on){
+  EXEC.t+=dt;
+  if(!enemies.some(e=>e.state!=='dead'&&e.exec)){EXEC.on=false;$('execBan').hidden=true;toast('Execution order stopped','#5fe28c');
+   hostages.forEach(h=>{if(!h.dead&&!h.free)h.ring.material.color.setHex(0xffbf3c);});}
+  return;}
+ const bound=hostages.filter(h=>!h.dead&&!h.free&&!h.gone);if(!bound.length||enemies.length<3)return;
+ const al=enemies.filter(e=>e.state!=='dead');if(!al.length)return;
+ if(al.length<=Math.max(2,Math.floor(enemies.length*.2))||timeLeft<=25)startExec();
+}
+function updateExecEnemy(e,dt){
+ e.xdelay-=dt;let v=0;
+ let h=null,bd=1e9;
+ for(const o of hostages){if(o.dead||o.free||o.gone)continue;const d=Math.hypot(o.x-e.x,o.z-e.z);if(d<bd){bd=d;h=o;}}
+ if(!h){e.exec=false;goCombat(e,player.x,player.z);return;}
+ if(e.xdelay<=0){
+  if(bd>1.3){e.target={x:h.x,z:h.z};v=followPath(e,dt,3.9);}
+  else{e.h=turnToward(e.h,Math.atan2(h.z-e.z,h.x-e.x),dt*14);e.xs+=dt;
+   if(e.xs>.8){e.xs=0;const mz=e.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},60);noise(.12,.2,2000);killHostage(h,'exec');}}
+ }
+ legs(e,v,dt);setPose(e);
 }
 
 /* ---------- camera + faded vision overlay ---------- */
@@ -2024,7 +2276,7 @@ function update(dt){
   if(L.stairs.length&&!tk){player.stairCd-=dt;if(player.stairCd<=0)for(const st of L.stairs){
     const inA=player.x>=st.a.x&&player.x<st.a.x+st.a.w&&player.z>=st.a.y&&player.z<st.a.y+st.a.h,inB=player.x>=st.b.x&&player.x<st.b.x+st.b.w&&player.z>=st.b.y&&player.z<st.b.y+st.b.h;
     if(inA){gotoStairs(st.bx,st.bz,st.bh,'Upstairs');break;}if(inB){gotoStairs(st.ax,st.az,st.ah,'Downstairs');break;}}}
-  if(player.reload>0){player.reload-=dt;if(player.reload<=0)player.ammo=player.mag;}
+  if(player.reload>0){player.reload-=dt;if(player.reload<=0){const nd=Math.min(player.mag-player.ammo,player.spare);player.ammo+=nd;player.spare-=nd;}}
   const fwd=keys.KeyW||keys.ArrowUp,back=keys.KeyS||keys.ArrowDown,left=keys.KeyA||keys.ArrowLeft,right=keys.KeyD||keys.ArrowRight;
   const shift=!player.crouch&&(keys.ShiftLeft||keys.ShiftRight||keys.Sprint);
   let autoFire=false;
@@ -2065,27 +2317,28 @@ function update(dt){
   if(tk)updateTakedown(dt);player.mesh.position.y=Math.abs(Math.sin(player.anim))*.04*Math.min(1,player.sp/3);
   if(pushing){const px=player.x+pushX*.6,pz=player.z+pushZ*.6,tx=Math.floor(px),tz=Math.floor(pz);
    if(tx>=0&&tz>=0&&tx<W&&tz<H&&grid[tz][tx]===3&&!doors[tz*W+tx].open){player.push+=dt;if(player.push>.3){openDoor(doors[tz*W+tx],player.x,player.z,false);player.push=0;}}else player.push=0;}else player.push=0;
-  if(!tk&&(keys.Space||mouseDown||autoFire)&&player.cool<=0&&player.reload<=0){if(player.ammo>0)shoot();else startReload();}
+  if(!tk&&(keys.Space||mouseDown||autoFire)&&player.cool<=0&&player.reload<=0){if(player.ammo>0)shoot();else if(player.spare>0)startReload();else noAmmoHint();}
   if(cutting){const h=nearHostage();if(keys.KeyE&&h===cutting){cutProg+=dt/.9;$('cut').style.display='flex';$('cutFill').style.width=Math.min(100,cutProg*100)+'%';
-    if(cutProg>=1){cutting.free=true;player.hp=Math.min(100,player.hp+30);cutting.ring.material.color.setHex(0x5fe28c);cutting.mesh.position.y=0;cutting=null;cutProg=0;$('cut').style.display='none';noise(.05,.2,5000);
+    if(cutProg>=1){cutting.free=true;startEscape(cutting);player.hp=Math.min(100,player.hp+30);cutting.ring.material.color.setHex(0x5fe28c);cutting.mesh.position.y=0;cutting=null;cutProg=0;$('cut').style.display='none';noise(.05,.2,5000);
      const n=hostages.filter(x=>x.free).length;toast('Hostage secured '+n+'/'+hostages.length+'  +30 HP','#5fe28c');
      }}
    else{cutting=null;cutProg=0;$('cut').style.display='none';}}
   enemies.forEach(e=>updateEnemy(e,dt));
-  updateBullets(dt);updateDrill(dt);updateAllies(dt);updateCops(dt);
-  if(state==='play'&&!tk){const nH=hostages.length,fr=hostages.filter(h=>h.free).length,al=enemies.filter(e=>e.state!=='dead').length,dOK=!(DR&&DR.alive);if(enemies.length&&al===0&&dOK)startEnding('clear');else if(nH&&fr===nH&&dOK)startEnding('fbi');else if(nH&&fr===nH&&!allyOn&&DR)spawnAllies();}
+  updateBullets(dt);updateDrill(dt);updateAllies(dt);updateCops(dt);updateHostages(dt);checkExec(dt);
+  if(nearTrunk&&player.spare<spareMax()){player.spare=Math.min(spareMax(),player.spare+wpn().mag*2*dt);if(!restockOn){restockOn=true;toast('Restocking ammo','#5fe28c');}}else if(!nearTrunk)restockOn=false;
+  if(state==='play'&&!tk){const alv=hostages.filter(h=>!h.dead),nH=alv.length,fr=alv.filter(h=>h.free).length,al=enemies.filter(e=>e.state!=='dead').length,dOK=!(DR&&DR.alive);if(enemies.length&&al===0&&dOK)startEnding('clear');else if(nH&&fr===nH&&dOK)startEnding('fbi');else if(nH&&fr===nH&&!allyOn&&DR)spawnAllies();}
   hpFill.style.width=player.hp+'%';hpFill.style.background=player.hp>50?'var(--green)':player.hp>25?'var(--amber)':'var(--red)';hpNum.textContent=Math.ceil(player.hp);
   {const ac=$('armChip');ac.hidden=GEAR.armor<0;if(GEAR.armor>=0){$('armFill').style.width=Math.max(0,player.armor/armorMax()*100)+'%';$('armNum').textContent=Math.ceil(player.armor);}}
-  $('ammo').textContent=player.ammo+' / '+player.mag;$('reloadTag').textContent=player.reload>0?'reloading':'';
-  $('hostages').textContent=hostages.filter(h=>h.free).length+' / '+hostages.length;
+  $('ammo').textContent=player.ammo+' / '+player.spare;$('reloadTag').textContent=player.reload>0?'reloading':'';
+  $('hostages').textContent=hostages.filter(h=>h.free).length+' / '+hostages.length+(hDead?'  ✕'+hDead:'');
   $('hostiles').textContent=enemies.filter(e=>e.state!=='dead').length;
   $('stance').textContent=player.crouch?'Crouch':'Stand';
-  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(DR&&DR.alive&&Math.hypot(DR.x-player.x,DR.z-player.z)<2.4)txt='Kick the drill \u00b7 or shoot it';else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&player.hp<100)txt=player.sp<1.2?'Healing from the med kit':'Stand still to heal';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';}
+  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(DR&&DR.alive&&Math.hypot(DR.x-player.x,DR.z-player.z)<2.4)txt='Kick the drill \u00b7 or shoot it';else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&(player.hp<100||player.spare<spareMax()))txt=player.sp<1.2?'Med kit and ammo restock':'Stand still to heal and restock';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';}
   $('clock').textContent=fmtT(timeLeft);$('rec').classList.toggle('low',timeLeft<60);
  }
  hostages.forEach(h=>{h.ring.position.set(h.x,.03,h.z);h.ring.scale.setScalar(1+Math.sin(time*4)*.08);h.mesh.rotation.y=-h.h;});
  enemies.forEach(e=>{if(state!=='play')return;e.mesh.visible=canSee(e.x,e.z);});
- hostages.forEach(h=>{const v=h.gone?false:(state!=='play'||canSee(h.x,h.z));h.mesh.visible=v;h.ring.visible=v;});
+ hostages.forEach(h=>{const v=h.gone?false:(state!=='play'||canSee(h.x,h.z));h.mesh.visible=v;h.ring.visible=v&&!h.dead;});
  {const ft=(state==='ending'&&EN.focus)?EN.focus:player;cam.x+=(ft.x-cam.x)*Math.min(1,dt*6);cam.z+=(ft.z-cam.z)*Math.min(1,dt*6);}
  updateLaser();
  shake=Math.max(0,shake-dt*1.2);const sx=(Math.random()-.5)*shake,sz=(Math.random()-.5)*shake;
