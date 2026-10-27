@@ -2029,7 +2029,7 @@ function updateFightEnemy(e,dt){
 }
 
 /* ---------- time penalties, ammo, hostages, execution order ---------- */
-let tpAcc=0,tpT=0,hDead=0,hPen=0,EXEC={on:false,t:0},hintT=-9,restockOn=false;
+let TU={on:false,t:0},tpAcc=0,tpT=0,hDead=0,hPen=0,EXEC={on:false,t:0},hintT=-9,restockOn=false;
 function timePenalty(s,why){
  if(state!=='play'||s<=0)return;
  timeLeft-=s;tpAcc=tpT>0?tpAcc+s:s;tpT=1.8;
@@ -2050,7 +2050,7 @@ function deathPenalty(e){
 function spareMax(){return wpn().mag*5;}
 function noAmmoHint(){if(time-hintT>2.2){hintT=time;toast('Out of ammo — restock at your cruiser','#ff4a3c');}}
 function resetHostages(){
- hDead=0;hPen=0;EXEC={on:false,t:0};tpAcc=0;tpT=0;restockOn=false;
+ TU={on:false,t:0};hDead=0;hPen=0;EXEC={on:false,t:0};tpAcc=0;tpT=0;restockOn=false;
  hostages.forEach(h=>{h.hits=0;h.dead=false;h.esc=false;h.gone=false;h.flash=0;h.r=.28;h.mesh.rotation.z=0;h.mesh.rotation.x=0;h.ring.visible=true;h.ring.material.color.setHex(0xffbf3c);h.target=null;h.path=null;h.out=null;setFlash(h.mesh,false);});
  const b=$('execBan');if(b)b.hidden=true;const el=$('tpen');if(el)el.className='';
 }
@@ -2061,7 +2061,7 @@ function killHostage(h,by){
  if(by==='player')hPen++;
  toast('Hostage lost  '+hDead+' / 3 allowed','#ff4a3c');
  introSay(by==='player'?"Damn it! Watch your fire. That was a civilian!":by==='exec'?"They're executing the hostages! Stop them!":"We lost a hostage! Keep it together!");
- if(state!=='play')return;
+ if(state!=='play'||TU.on)return;
  if(hDead>3)endGame('lost','Too many hostages lost','Four hostages died on your watch.');
  else if(EXEC.on&&!hostages.some(x=>!x.dead&&!x.free&&!x.gone))endGame('lost','Hostages executed','The crew carried out the order before you could stop them.');
  else if(hostages.every(x=>x.dead))endGame('lost','No hostages left','Every hostage was lost.');
@@ -2122,7 +2122,7 @@ function startExec(){
  const b=$('execBan');if(b)b.hidden=false;
 }
 function checkExec(dt){
- if(state!=='play')return;
+ if(state!=='play'||TU.on)return;
  tpT-=dt;if(tpT<=0&&tpAcc){tpAcc=0;$('tpen').className='';}
  if(EXEC.on){
   EXEC.t+=dt;
@@ -2157,6 +2157,17 @@ function swapWeapon(){
  const w=wpn(),st=player.wstock[GEAR.equip];
  player.mag=w.mag;player.reload=0;player.cool=.4;player.ammo=st?Math.min(st.ammo,w.mag):w.mag;player.spare=st?Math.min(st.spare,spareMax()):spareMax();
  toast(w.name+' equipped','#5fe28c');
+}
+
+/* ---------- timer hits zero: the crew executes every hostage still tied up ---------- */
+function timeUp(dt){
+ if(!TU.on){TU={on:true,t:.8};toast("TIME'S UP \u2014 they're killing the hostages!",'#ff4a3c');introSay("Time's up! They're killing the hostages!");const b=$('execBan');if(b){b.textContent="TIME'S UP \u00b7 HOSTAGES BEING EXECUTED";b.hidden=false;}}
+ TU.t-=dt;if(TU.t>0)return;
+ const h=hostages.find(x=>!x.dead&&!x.free&&!x.gone);
+ if(!h){endGame('lost','Time expired','The suspects executed the hostages still inside.');return;}
+ TU.t=.7;let e=null,bd=1e9;for(const o of enemies){if(o.state==='dead')continue;const d=Math.hypot(o.x-h.x,o.z-h.z);if(d<bd){bd=d;e=o;}}
+ if(e){e.h=Math.atan2(h.z-e.z,h.x-e.x);const mz=e.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},70);}
+ noise(.14,.22,1900);killHostage(h,'exec');
 }
 
 /* ---------- camera + faded vision overlay ---------- */
@@ -2299,7 +2310,7 @@ function update(dt){
   nearTrunk=dd<1.9;}
  if(state==='play'){
   playTime+=dt;timeLeft-=dt;
-  if(timeLeft<=0){timeLeft=0;endGame('lost','Time expired','The suspects executed the hostages still inside.');}
+  if(timeLeft<=0){timeLeft=0;timeUp(dt);}
   player.cool-=dt;
   if(nearTrunk&&!tk&&player.sp<1.2&&player.hp<100)player.hp=Math.min(100,player.hp+7*dt);
   if(L.stairs.length&&!tk){player.stairCd-=dt;if(player.stairCd<=0)for(const st of L.stairs){
