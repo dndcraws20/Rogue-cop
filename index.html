@@ -1893,7 +1893,9 @@ function pickFightEnemies(){
 function fightSnd(x,z,f){if(FIGHT.snd>0)return;if(Math.hypot(x-player.x,z-player.z)<26){FIGHT.snd=.07;noise(.05,.08,f);}}
 function copDamage(c,n){if(c.dead)return;c.hp-=n;spark(c.x,c.z,1.1);if(c.hp<=0){c.dead=true;c.fall=0;noise(.06,.18,800);}}
 function copHit(e,n,x,z){
- if(e.state==='dead')return;e.hp-=n;e.flash=.12;spark(e.x,e.z,1.1);
+ if(e.state==='dead')return;
+ if(e.hp-n<=0&&enemies.filter(o=>o.state!=='dead').length<=3){e.hp=Math.max(e.hp,8);n=Math.min(n,e.hp-5);}
+ e.hp-=n;e.flash=.12;spark(e.x,e.z,1.1);
  if(e.hp<=0){e.state='dead';e.fall=0;e.path=null;e.fight=false;e.guard=false;e.exec=false;onDeath(e,'a');}
  else if(!e.fight&&!e.exec&&e.state!=='alert')goCombat(e,x,z);
 }
@@ -2117,7 +2119,7 @@ function checkExec(dt){
   if(!enemies.some(e=>e.state!=='dead'&&e.exec)){EXEC.on=false;$('execBan').hidden=true;toast('Execution order stopped','#5fe28c');
    hostages.forEach(h=>{if(!h.dead&&!h.free)h.ring.material.color.setHex(0xffbf3c);});}
   return;}
- const bound=hostages.filter(h=>!h.dead&&!h.free&&!h.gone);if(!bound.length||enemies.length<3)return;
+ const bound=hostages.filter(h=>!h.dead&&!h.free&&!h.gone);if(!bound.length||enemies.length<3||killed<1)return;
  const al=enemies.filter(e=>e.state!=='dead');if(!al.length)return;
  if(al.length<=Math.max(2,Math.floor(enemies.length*.2))||timeLeft<=25)startExec();
 }
