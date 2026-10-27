@@ -802,7 +802,7 @@ function makeBank(){
   {t:'tree',x:3,y:30,w:1,h:1},{t:'tree',x:42,y:30,w:1,h:1}
  ];
  const copDefs=[];
- for(const [x,y] of [[8,30],[11,30],[15,30],[19,30],[26,30],[30,30],[34,30],[38,30],[21,31],[24,31],[12,31],[33,31],[11,33],[25,34],[40,33],[5,34],[33,33],[14,34]]){furniture.push({t:'copblock',x,y,w:1,h:1,f:'n'});copDefs.push([x+.5,y+.5]);}
+ for(const [x,y] of [[8,30],[11,30],[15,30],[19,30],[26,30],[30,30],[34,30],[38,30],[21,31],[24,31],[12,31],[33,31],[11,33],[25,34],[40,33],[5,34],[33,33],[14,34]]){furniture.push({t:'copblock',x,y,w:1,h:1,f:'n',nc:true});copDefs.push([x+.5,y+.5]);}
  furniture.forEach(f=>{if(f.nc)return;for(let y=f.y;y<f.y+f.h;y++)for(let x=f.x;x<f.x+f.w;x++)grid[y][x]=4;});
  const windows=[];
  for(const x of [7,9,11,13,15,17,19,26,28,30,32,34,36,38,40])windows.push([x+.5,28.5,true]);
@@ -2099,7 +2099,8 @@ function updateHostages(dt){
 }
 function startExec(){
  const al=enemies.filter(e=>e.state!=='dead');if(!al.length)return;
- EXEC={on:true,t:0};
+ EXEC={on:true,t:0,pend:false};
+ if(DR&&DR.alive){EXEC.pend=true;timePenalty(60,'Execution order  \u22121:00 (drill still running)');}else timePenalty(180,'Execution order  \u22123:00');
  toast("They're executing the hostages!",'#ff4a3c');
  introSay("The last ones are killing the hostages! Get in there!");
  shake=Math.max(shake,.5);
@@ -2112,6 +2113,7 @@ function checkExec(dt){
  tpT-=dt;if(tpT<=0&&tpAcc){tpAcc=0;$('tpen').className='';}
  if(EXEC.on){
   EXEC.t+=dt;
+  if(EXEC.pend&&DR&&!DR.alive){EXEC.pend=false;timePenalty(120,'Drill down — order carried out  \u22122:00');}
   if(!enemies.some(e=>e.state!=='dead'&&e.exec)){EXEC.on=false;$('execBan').hidden=true;toast('Execution order stopped','#5fe28c');
    hostages.forEach(h=>{if(!h.dead&&!h.free)h.ring.material.color.setHex(0xffbf3c);});}
   return;}
@@ -2124,7 +2126,7 @@ function updateExecEnemy(e,dt){
  let h=null,bd=1e9;
  for(const o of hostages){if(o.dead||o.free||o.gone)continue;const d=Math.hypot(o.x-e.x,o.z-e.z);if(d<bd){bd=d;h=o;}}
  if(!h){e.exec=false;goCombat(e,player.x,player.z);return;}
- if(e.xdelay<=0){
+ if(e.xdelay<=0&&(bd>1.3||timeLeft<=20)){
   if(bd>1.3){e.target={x:h.x,z:h.z};v=followPath(e,dt,3.9);}
   else{e.h=turnToward(e.h,Math.atan2(h.z-e.z,h.x-e.x),dt*14);e.xs+=dt;
    if(e.xs>.8){e.xs=0;const mz=e.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},60);noise(.12,.2,2000);killHostage(h,'exec');}}
