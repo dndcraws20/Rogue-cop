@@ -36,6 +36,9 @@ body{background:var(--ink);color:var(--fg);font-family:var(--mono);overflow:hidd
 #tdBtn{display:none;position:fixed;left:50%;top:60%;transform:translateX(-50%);pointer-events:auto;cursor:pointer;touch-action:manipulation;font-family:var(--display);font-weight:900;font-size:26px;letter-spacing:.12em;text-transform:uppercase;background:var(--amber);color:#101010;border:0;border-radius:3px;padding:12px 22px;box-shadow:0 6px 24px rgba(0,0,0,.55);white-space:nowrap}
 #tdBtn span{font-family:var(--mono);font-size:11px;font-weight:600;margin-left:12px;border:1px solid rgba(0,0,0,.45);border-radius:3px;padding:1px 6px;letter-spacing:0;vertical-align:middle}
 #tdBtn:hover{background:#ffd06b}#tdBtn:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+#swBtn{display:none;position:fixed;left:50%;top:70%;transform:translateX(-50%);pointer-events:auto;cursor:pointer;touch-action:manipulation;font-family:var(--display);font-weight:900;font-size:26px;letter-spacing:.12em;text-transform:uppercase;background:var(--amber);color:#101010;border:0;border-radius:3px;padding:12px 22px;box-shadow:0 6px 24px rgba(0,0,0,.55);white-space:nowrap}
+#swBtn span{font-family:var(--mono);font-size:11px;font-weight:600;margin-left:12px;border:1px solid rgba(0,0,0,.45);border-radius:3px;padding:1px 6px;letter-spacing:0;vertical-align:middle}
+#swBtn:hover{background:#ffd06b}#swBtn:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
 #prompt{position:fixed;left:50%;bottom:34%;transform:translateX(-50%);display:none;background:var(--panel);border:1px solid var(--amber);border-radius:3px;padding:6px 12px;font-size:12px;letter-spacing:.1em;color:var(--amber);pointer-events:none;white-space:nowrap}
 #cut{position:fixed;left:50%;bottom:26%;transform:translateX(-50%);display:none;flex-direction:column;gap:6px;align-items:center;font-size:11px;letter-spacing:.18em;color:var(--amber)}
 #cut .bar{width:180px}#cut .bar i{background:var(--amber);width:0}
@@ -151,6 +154,7 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
 <canvas id="fog"></canvas>
 <div id="hud" hidden>
   <button id="tdBtn" type="button">Stealth takedown<span>E</span></button>
+  <button id="swBtn" type="button">Swap weapon<span>Q</span></button>
   <div class="col">
     <div class="chip" id="armChip" hidden><span class="lbl">Armor</span><div class="bar"><i id="armFill" style="background:var(--blue)"></i></div><b id="armNum">50</b></div>
     <div class="chip"><span class="lbl">Health</span><div class="bar"><i id="hpFill"></i></div><b id="hpNum">100</b></div>
@@ -988,7 +992,8 @@ function shoot(){
  const w=wpn();player.cool=w.cool;player.ammo--;shake=Math.max(shake,w.gun==='smg'?.08:.05);
  let a=player.h+(Math.random()-.5)*w.spread;
  if(w.laser){let bd=.07;for(const e of enemies){if(e.state==='dead')continue;const dx=e.x-player.x,dz=e.z-player.z,dd=Math.hypot(dx,dz);if(dd>14||dd<1)continue;const an=Math.abs(angDiff(Math.atan2(dz,dx),a));if(an<bd&&los(player.x,player.z,e.x,e.z)){bd=an;a=Math.atan2(dz,dx);}}}
- spawnBullet(player.x+Math.cos(player.h)*.9,player.z+Math.sin(player.h)*.9,a,'p',w.dmg);
+ if(w.pellets){for(let i=0;i<w.pellets;i++){const pa=a+(Math.random()-.5)*w.spread*2.4;spawnBullet(player.x+Math.cos(player.h)*.9,player.z+Math.sin(player.h)*.9,pa,'p',w.dmg);bullets[bullets.length-1].life=w.life;}shake=Math.max(shake,.2);}
+ else spawnBullet(player.x+Math.cos(player.h)*.9,player.z+Math.sin(player.h)*.9,a,'p',w.dmg);
  const mz=player.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},60);noise(.12,w.sil?.03:.28,3200);
  makeNoise(player.x,player.z,w.sil?9:60);shotPenalty(w.sil?9:60);
  if(!w.sil)for(const e of enemies){if(e.state==='dead'||e.state==='alert')continue;const rx=e.x-player.x,rz=e.z-player.z,al=rx*Math.cos(a)+rz*Math.sin(a),pp=Math.abs(-rx*Math.sin(a)+rz*Math.cos(a));if(al>0&&al<14&&pp<1.3&&los(player.x,player.z,e.x,e.z))goCombat(e,player.x,player.z);}
@@ -1147,7 +1152,7 @@ function reset(){
  enemies.forEach((e,i)=>{const d=L.enemyDefs[i];Object.assign(e,{x:d[0],z:d[1],h:d[2],hp:100,state:'idle',walking:false,wait:Math.random()*2+.5,chat:0,visit:null,shout:0,susT:0,look:0,arrived:false,joinT:0,faceT:0,iconT:0,burst:0,exec:false,fight:false,guard:false,dodgeT:0,cool:0,stun:0,flash:0,fall:0,path:null,target:null,lost:0,react:0});e.mesh.rotation.z=0;e.mesh.rotation.x=0;e.grabbed=false;e.found=false;setState(e,'idle');setFlash(e.mesh,false);setPose(e);});
  hostages.forEach((h,i)=>{const d=L.hostageDefs[i];h.free=false;h.x=d[0];h.z=d[1];h.ring.material.color.setHex(0xffbf3c);setPose(h);h.mesh.position.y=-.12;});
  bullets.forEach(b=>scene.remove(b.m));bullets.length=0;resetDoors();killed=0;playTime=0;cutting=null;cutProg=0;timeLeft=L.timeLimit;
- player.spare=spareMax();resetHostages();resetCops();pickFightEnemies();
+ player.spare=spareMax();player.wstock={};resetHostages();resetCops();pickFightEnemies();
  cam.x=player.x;cam.z=player.z;
 }
 function scaleEnemies(){
@@ -1748,27 +1753,33 @@ function finishEnding(){
 
 /* ---------- armory: weapons, attachments, armor ---------- */
 function ARMORS_OK(t){return t==='medium'||t==='heavy'?t:'light';}
-let GEAR={own:{},equip:'pistol',armor:-1,armorType:'light'};
+let GEAR={own:{},att:{},equip:'pistol',armor:-1,armorType:'light'};
+const ATT_IDS=['sil','laser','dmg','rate','mag'];
 const REPAIR_PER=40;
 const ARMORS={light:{name:'Light body armor',max:50,price:3000,slow:1,desc:'Soaks 50 damage. No slowdown.'},medium:{name:'Medium body armor',max:100,price:7500,slow:.965,desc:'Soaks 100 damage. Slows you down a very tiny bit.'},heavy:{name:'Heavy body armor',max:200,price:14000,slow:.86,desc:'Soaks 200 damage. Noticeably slower on your feet.'}};
 function armorMax(){return GEAR.armor<0?0:ARMORS[GEAR.armorType].max;}
 function armorSlow(){return (GEAR.armor>=0&&player.armor>0)?ARMORS[GEAR.armorType].slow:1;}
-try{const s=JSON.parse(localStorage.getItem('hotEntryGear'));if(s&&typeof s==='object')GEAR={own:s.own||{},equip:s.equip||'pistol',armor:typeof s.armor==='number'?s.armor:-1,armorType:ARMORS_OK(s.armorType)};}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('hotEntryGear'));if(s&&typeof s==='object'){
+ GEAR={own:s.own||{},att:s.att||{},equip:s.equip||'pistol',armor:typeof s.armor==='number'?s.armor:-1,armorType:ARMORS_OK(s.armorType)};
+ if(!s.att){const eq=GEAR.equip,a={};for(const k of ATT_IDS)if(GEAR.own[k]){a[k]=1;delete GEAR.own[k];}GEAR.att[eq]=a;}
+ if(GEAR.equip!=='pistol'&&!GEAR.own[GEAR.equip])GEAR.equip='pistol';}}catch(e){}
 function saveGear(){try{localStorage.setItem('hotEntryGear',JSON.stringify(GEAR));}catch(e){}}
-const WPN={pistol:{name:'Service pistol',dmg:50,cool:.17,mag:15,spread:.03,rel:1.25,gun:'pistol'},smg:{name:'Street sweeper SMG',dmg:34,cool:.085,mag:30,spread:.09,rel:1.7,gun:'smg'}};
-function wpn(){const b=WPN[GEAR.equip]||WPN.pistol,o=GEAR.own;
- return {name:b.name,gun:b.gun,dmg:o.dmg?b.dmg*2:b.dmg,cool:o.rate?b.cool*.68:b.cool,mag:o.mag?Math.round(b.mag*1.6):b.mag,spread:o.laser?b.spread*.25:b.spread,rel:b.rel,sil:!!o.sil,laser:!!o.laser};}
+const WPN={pistol:{name:'Service pistol',dmg:50,cool:.17,mag:15,spread:.03,rel:1.25,gun:'pistol'},smg:{name:'Street sweeper SMG',dmg:34,cool:.085,mag:30,spread:.09,rel:1.7,gun:'smg'},shotgun:{name:'Riot shotgun',dmg:28,cool:.8,mag:6,spread:.13,rel:2.2,gun:'shotgun',pellets:8,life:.36}};
+function attOf(){return GEAR.att[GEAR.equip]||(GEAR.att[GEAR.equip]={});}
+function wpn(){const b=WPN[GEAR.equip]||WPN.pistol,o=attOf();
+ return {name:b.name,gun:b.gun,dmg:o.dmg?b.dmg*2:b.dmg,cool:o.rate?b.cool*.68:b.cool,mag:o.mag?Math.round(b.mag*1.6):b.mag,spread:o.laser?b.spread*.25:b.spread,rel:b.rel,sil:!!o.sil,laser:!!o.laser,pellets:b.pellets||0,life:b.life||1.3};}
 const ATTACH=[
  {id:'sil',name:'Suppressor',price:4500,desc:'Shots are nearly silent. Enemies only notice if they are right next to you.'},
  {id:'laser',name:'Laser sight',price:3500,desc:'Red beam, much tighter spread and a little aim assist.'},
  {id:'dmg',name:'Hollow-point +P rounds',price:7000,desc:'Double damage. The pistol kills in one hit.'},
  {id:'rate',name:'Trigger job',price:4000,desc:'Fires about 45% faster.'},
  {id:'mag',name:'Extended magazine',price:2500,desc:'60% more rounds per mag.'}];
-const SMG_PRICE=9000;
-let gunSMG=null,laserM=null;
+const SMG_PRICE=9000,WPN_PRICE={smg:9000,shotgun:6500};
+let gunSMG=null,gunSG=null,laserM=null;
 function applyLoadout(){
  if(!gunSMG){gunSMG=new THREE.Group();const b1=new THREE.Mesh(geo(.62,.14,.12),M(0x1a1a1a)),b2=new THREE.Mesh(geo(.09,.24,.1),M(0x111111));b1.position.set(.8,1.02,0);b2.position.set(.72,.86,0);gunSMG.add(b1,b2);player.mesh.add(gunSMG);}
- gunSMG.visible=GEAR.equip==='smg';
+ if(!gunSG){gunSG=new THREE.Group();const s1=new THREE.Mesh(geo(.95,.1,.1),M(0x2a2a2e)),s2=new THREE.Mesh(geo(.4,.13,.11),M(0x6b4a2a)),s3=new THREE.Mesh(geo(.3,.07,.12),M(0x111111));s1.position.set(.95,1.02,0);s2.position.set(.5,1.0,0);s3.position.set(.95,.95,0);gunSG.add(s1,s2,s3);player.mesh.add(gunSG);}
+ gunSMG.visible=GEAR.equip==='smg';gunSG.visible=GEAR.equip==='shotgun';
  if(!laserM){laserM=new THREE.Mesh(geo(1,.025,.025),new THREE.MeshBasicMaterial({color:0xff2a1a,transparent:true,opacity:.75}));laserM.visible=false;scene.add(laserM);}
 }
 function updateLaser(){
@@ -1783,11 +1794,11 @@ function shopRow(title,desc,right){return '<div class="srow"><div class="sinfo">
 function renderShop(){
  $('sCash').textContent=money(CASH);
  let h='<h3>Weapons</h3>';
- for(const id of ['pistol','smg']){const b=WPN[id],owned=id==='pistol'||GEAR.own.smg,on=GEAR.equip===id;
-  const d=id==='pistol'?'Reliable. 15 rounds, 2 hits to drop a suspect.':'Rapid fire like the gunmen carry. 30 rounds, loud and hungry for ammo.';
-  h+=shopRow(b.name,d,owned?(on?'<button class="btn ghost sbtn" disabled>Equipped</button>':'<button class="btn sbtn" data-a="equip" data-id="'+id+'">Equip</button>'):'<button class="btn sbtn" data-a="buy" data-id="smg"'+(CASH<SMG_PRICE?' disabled':'')+'>'+money(SMG_PRICE)+'</button>');}
- h+='<h3>Attachments <small>apply to your equipped weapon</small></h3>';
- for(const a of ATTACH)h+=shopRow(a.name,a.desc,GEAR.own[a.id]?'<button class="btn ghost sbtn" disabled>Owned</button>':'<button class="btn sbtn" data-a="buy" data-id="'+a.id+'"'+(CASH<a.price?' disabled':'')+'>'+money(a.price)+'</button>');
+ for(const id of ['pistol','smg','shotgun']){const b=WPN[id],owned=id==='pistol'||GEAR.own[id],on=GEAR.equip===id;
+  const d=id==='pistol'?'Reliable. 15 rounds, 2 hits to drop a suspect.':id==='smg'?'Rapid fire like the gunmen carry. 30 rounds, loud and hungry for ammo.':'Eight pellets per shell. Devastating up close, weak at range, slow pump. 6 shells.';
+  h+=shopRow(b.name,d,owned?(on?'<button class="btn ghost sbtn" disabled>Equipped</button>':'<button class="btn sbtn" data-a="equip" data-id="'+id+'">Equip</button>'):'<button class="btn sbtn" data-a="buy" data-id="'+id+'"'+(CASH<WPN_PRICE[id]?' disabled':'')+'>'+money(WPN_PRICE[id])+'</button>');}
+ h+='<h3>Attachments <small>fitted to your equipped weapon: '+wpn().name+'. Swap weapons at your cruiser in a mission.</small></h3>';
+ for(const a of ATTACH)h+=shopRow(a.name,a.desc,attOf()[a.id]?'<button class="btn ghost sbtn" disabled>Fitted</button>':'<button class="btn sbtn" data-a="buy" data-id="'+a.id+'"'+(CASH<a.price?' disabled':'')+'>'+money(a.price)+'</button>');
  h+='<h3>Armor <small>one set at a time; buying another replaces it</small></h3>';
  for(const id of ['light','medium','heavy']){const A=ARMORS[id],mine=GEAR.armor>=0&&GEAR.armorType===id;
   if(mine){const c=armorFixCost();h+=shopRow(A.name,'Plates: '+Math.round(GEAR.armor)+' / '+A.max+(GEAR.armor<=0?' \u2014 BROKEN':'')+' \u00b7 '+A.desc,c?'<button class="btn sbtn" data-a="repair"'+(CASH<c?' disabled':'')+'>Repair '+money(c)+'</button>':'<button class="btn ghost sbtn" disabled>Intact</button>');}
@@ -1799,9 +1810,9 @@ function shopMsg(t,col){const e=$('sToast');e.textContent=t;e.style.color=col||'
 function shopAct(a,id){
  if(a==='equip'){GEAR.equip=id;saveGear();shopMsg(WPN[id].name+' equipped','#5fe28c');}
  else if(a==='repair'){const c=armorFixCost();if(CASH<c)return;CASH-=c;GEAR.armor=armorMax();saveCash();saveGear();shopMsg('Armor repaired','#5fe28c');}
- else{let p=0;if(id==='smg')p=SMG_PRICE;else if(id.indexOf('armor-')===0)p=ARMORS[id.slice(6)].price;else p=ATTACH.find(x=>x.id===id).price;
+ else{let p=0;if(WPN_PRICE[id])p=WPN_PRICE[id];else if(id.indexOf('armor-')===0)p=ARMORS[id.slice(6)].price;else p=ATTACH.find(x=>x.id===id).price;
   if(CASH<p){shopMsg('Not enough cash','#ff4a3c');return;}
-  CASH-=p;if(id.indexOf('armor-')===0){GEAR.armorType=id.slice(6);GEAR.armor=ARMORS[GEAR.armorType].max;}else GEAR.own[id]=1;saveCash();saveGear();shopMsg('Purchased','#5fe28c');}
+  CASH-=p;if(id.indexOf('armor-')===0){GEAR.armorType=id.slice(6);GEAR.armor=ARMORS[GEAR.armorType].max;}else if(WPN_PRICE[id])GEAR.own[id]=1;else attOf()[id]=1;saveCash();saveGear();shopMsg('Purchased','#5fe28c');}
  renderShop();
 }
 function showShop(){state='shop';$('board').hidden=true;$('shop').hidden=false;renderShop();}
@@ -2136,6 +2147,18 @@ function updateExecEnemy(e,dt){
  legs(e,v,dt);setPose(e);
 }
 
+/* ---------- swap weapons at the cruiser ---------- */
+function ownedWeapons(){return ['pistol','smg','shotgun'].filter(id=>id==='pistol'||GEAR.own[id]);}
+function swapWeapon(){
+ if(state!=='play'||tk||!nearTrunk)return;
+ const list=ownedWeapons();if(list.length<2){toast('Only one weapon owned — buy more in the Armory','#93a1ba');return;}
+ player.wstock=player.wstock||{};player.wstock[GEAR.equip]={ammo:player.ammo,spare:player.spare};
+ GEAR.equip=list[(list.indexOf(GEAR.equip)+1)%list.length];saveGear();applyLoadout();
+ const w=wpn(),st=player.wstock[GEAR.equip];
+ player.mag=w.mag;player.reload=0;player.cool=.4;player.ammo=st?Math.min(st.ammo,w.mag):w.mag;player.spare=st?Math.min(st.spare,spareMax()):spareMax();
+ toast(w.name+' equipped','#5fe28c');
+}
+
 /* ---------- camera + faded vision overlay ---------- */
 const cam={x:8.5,z:19.5};let camH=17,vw=1,vh=1;
 const fogC=$('fog'),fctx=fogC.getContext('2d');let fw=1,fh=1;
@@ -2239,6 +2262,7 @@ function setKey(code,down){if(down&&!keys[code])onPress(code);keys[code]=down;}
 function onPress(code){
  if(state!=='play')return;
  if(code==='KeyR')startReload();
+ if(code==='KeyQ')swapWeapon();
  if(tk)return;
  if(code==='KeyC'){player.crouch=!player.crouch;toast(player.crouch?'Crouching':'Standing','#93a1ba');}
  if(code==='KeyE'){const h=nearHostage();if(h){cutting=h;cutProg=0;}else{const tt=takedownTarget();if(tt)startTakedown(tt);else kick();}}
@@ -2251,6 +2275,7 @@ window.addEventListener('mouseup',()=>{mouseDown=false;});
 document.querySelectorAll('#touch button').forEach(b=>{const k=b.dataset.k;
  b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('on');setKey(k,true);});
  const up=()=>{b.classList.remove('on');setKey(k,false);};b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);});
+$('swBtn').addEventListener('pointerdown',e=>{e.preventDefault();swapWeapon();});
 $('tdBtn').addEventListener('pointerdown',e=>{e.preventDefault();if(state==='play'&&!tk){const t=takedownTarget();if(t)startTakedown(t);}});
 $('startBtn').addEventListener('click',()=>{loadLevel(curLevel);fogC.style.display='block';startGame();});
 $('againBtn').addEventListener('click',()=>{$('endBox').hidden=true;if(BD.cur)loadLevel(BD.cur.type,BD.cur.diff);else loadLevel(curLevel);fogC.style.display='block';startGame();});
@@ -2337,7 +2362,7 @@ function update(dt){
   $('hostages').textContent=hostages.filter(h=>h.free).length+' / '+hostages.length+(hDead?'  ✕'+hDead:'');
   $('hostiles').textContent=enemies.filter(e=>e.state!=='dead').length;
   $('stance').textContent=player.crouch?'Crouch':'Stand';
-  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(DR&&DR.alive&&Math.hypot(DR.x-player.x,DR.z-player.z)<2.4)txt='Kick the drill \u00b7 or shoot it';else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&(player.hp<100||player.spare<spareMax()))txt=player.sp<1.2?'Med kit and ammo restock':'Stand still to heal and restock';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';}
+  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(DR&&DR.alive&&Math.hypot(DR.x-player.x,DR.z-player.z)<2.4)txt='Kick the drill \u00b7 or shoot it';else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&(player.hp<100||player.spare<spareMax()))txt=player.sp<1.2?'Med kit and ammo restock'+(ownedWeapons().length>1?' · Q swap weapon':''):'Stand still to heal and restock';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';$('swBtn').style.display=(nearTrunk&&!tk&&ownedWeapons().length>1)?'block':'none';}
   $('clock').textContent=fmtT(timeLeft);$('rec').classList.toggle('low',timeLeft<60);
  }
  hostages.forEach(h=>{h.ring.position.set(h.x,.03,h.z);h.ring.scale.setScalar(1+Math.sin(time*4)*.08);h.mesh.rotation.y=-h.h;});
