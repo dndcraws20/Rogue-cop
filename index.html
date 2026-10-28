@@ -2083,6 +2083,9 @@ function killHostage(h,by){
  if(by==='player')hPen++;
  toast('Hostage lost  '+hDead+' / 3 allowed','#ff4a3c');
  introSay(by==='player'?"Damn it! Watch your fire. That was a civilian!":by==='exec'?"They're executing the hostages! Stop them!":"We lost a hostage! Keep it together!");
+ hostageLossCheck();
+}
+function hostageLossCheck(){
  if(state!=='play'||TU.on)return;
  if(hDead>3)endGame('lost','Too many hostages lost','Four hostages died on your watch.');
  else if(EXEC.on&&!hostages.some(x=>!x.dead&&!x.free&&!x.gone))endGame('lost','Hostages executed','The crew carried out the order before you could stop them.');
@@ -2142,6 +2145,9 @@ function startExec(){
  hostages.forEach(h=>{if(!h.dead&&!h.free&&!h.gone)h.ring.material.color.setHex(0xff4a3c);});
  al.forEach(e=>{e.exec=true;e.fight=false;e.guard=false;setState(e,'alert');e.xdelay=.7+Math.random()*1.3;e.xs=0;});
  const b=$('execBan');if(b)b.hidden=false;
+ let pe=null,ph=null,pd=1e9;
+ for(const o of al)for(const x of hostages){if(x.dead||x.free||x.gone)continue;const d=Math.hypot(o.x-x.x,o.z-x.z);if(d<pd){pd=d;pe=o;ph=x;}}
+ startCine(pe,ph,'exec');
 }
 function checkExec(dt){
  if(state!=='play'||TU.on)return;
@@ -2188,8 +2194,51 @@ function timeUp(dt){
  const h=hostages.find(x=>!x.dead&&!x.free&&!x.gone);
  if(!h){endGame('lost','Time expired','The suspects executed the hostages still inside.');return;}
  TU.t=.7;let e=null,bd=1e9;for(const o of enemies){if(o.state==='dead')continue;const d=Math.hypot(o.x-h.x,o.z-h.z);if(d<bd){bd=d;e=o;}}
+ if(!TU.cine){TU.cine=true;if(e&&startCine(e,h,'timeup'))return;}
  if(e){e.h=Math.atan2(h.z-e.z,h.x-e.x);const mz=e.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},70);}
  noise(.14,.22,1900);killHostage(h,'exec');
+}
+
+/* ---------- execution cutscene: ~10 seconds, you watch a gunman walk up and shoot a hostage ---------- */
+let CINE={on:false};
+function startCine(e,h,kind){
+ if(state!=='play'||!e||!h||tk)return false;
+ const p=bfs(Math.floor(e.x),Math.floor(e.z),Math.floor(h.x),Math.floor(h.z));
+ if(p&&p.length>10){const q=p[p.length-10];e.x=q.x;e.z=q.z;}
+ CINE={on:true,t:0,ph:0,pt:0,e,h,kind};
+ state='cine';player.vx=0;player.vz=0;cutting=null;cutProg=0;$('cut').style.display='none';
+ e.path=null;e.pt=0;e.mesh.visible=true;h.mesh.visible=true;h.esc=false;h.r=.28;
+ $('hud').hidden=true;$('touch').style.display='none';$('prompt').style.display='none';$('hint').hidden=true;$('tdBtn').style.display='none';$('swBtn').style.display='none';fogC.style.display='none';
+ $('intro').hidden=false;$('skipBtn').style.display='none';requestAnimationFrame(()=>$('intro').classList.add('bars'));
+ enSub("They're executing the hostages\u2026");
+ EN.focus={x:e.x,z:e.z};return true;
+}
+function endCine(){
+ const C=CINE;C.on=false;state='play';
+ $('intro').classList.remove('bars');$('intro').hidden=true;$('skipBtn').style.display='';
+ $('hud').hidden=false;fogC.style.display='block';updateTouch();
+ C.e.xs=0;C.e.xdelay=.5;C.e.exec=C.e.exec;
+ hostageLossCheck();
+}
+function updateCine(dt){
+ const C=CINE;if(!C.on)return;C.t+=dt;const e=C.e,h=C.h;
+ const dx=h.x-e.x,dz=h.z-e.z,d=Math.hypot(dx,dz);
+ e.mesh.visible=true;h.mesh.visible=true;
+ if(C.ph===0){legs(e,0,dt);setPose(e);e.h=turnToward(e.h,Math.atan2(dz,dx),dt*6);if(C.t>1.8)C.ph=1;}
+ else if(C.ph===1){
+  let v=0;if(d>1.5&&C.t<6.3){e.target={x:h.x,z:h.z};v=followPath(e,dt,4.6);}else{C.ph=2;C.pt=0;}
+  legs(e,v,dt);setPose(e);}
+ else if(C.ph===2){
+  C.pt+=dt;e.h=turnToward(e.h,Math.atan2(dz,dx),dt*12);h.h=turnToward(h.h,Math.atan2(-dz,-dx),dt*8);
+  legs(e,0,dt);setPose(e);setPose(h);h.mesh.position.y=-.12;h.mesh.scale.y=1-.1*Math.min(1,C.pt*2);
+  if(C.pt>1.2&&C.t>7){
+   const mz=e.mesh.userData.muzzle;mz.visible=true;setTimeout(()=>{mz.visible=false;},90);
+   noise(.16,.25,1700);shake=Math.max(shake,.5);spark(h.x,h.z,1.1);spark(h.x+.2,h.z,.9);ring(h.x,h.z);
+   h.mesh.scale.y=1;killHostage(h,'exec');C.ph=3;C.pt=0;enSub('One hostage down.');}
+ }else{
+  C.pt+=dt;h.mesh.rotation.z=-1.55*Math.min(1,C.pt*3);h.mesh.position.y=.18*Math.min(1,C.pt*3);setPose(e);e.mesh.position.y=0;
+  if(C.pt>2.6)endCine();}
+ const f=C.ph<=1?e:C.ph===2?{x:(e.x+h.x)/2,z:(e.z+h.z)/2}:h;EN.focus={x:f.x,z:f.z};
 }
 
 /* ---------- camera + faded vision overlay ---------- */
@@ -2401,14 +2450,14 @@ function update(dt){
  hostages.forEach(h=>{h.ring.position.set(h.x,.03,h.z);h.ring.scale.setScalar(1+Math.sin(time*4)*.08);h.mesh.rotation.y=-h.h;});
  enemies.forEach(e=>{if(state!=='play')return;e.mesh.visible=canSee(e.x,e.z);});
  hostages.forEach(h=>{const v=h.gone?false:(state!=='play'||canSee(h.x,h.z));h.mesh.visible=v;h.ring.visible=v&&!h.dead;});
- {const ft=(state==='ending'&&EN.focus)?EN.focus:player;cam.x+=(ft.x-cam.x)*Math.min(1,dt*6);cam.z+=(ft.z-cam.z)*Math.min(1,dt*6);}
+ {const ft=((state==='ending'||state==='cine')&&EN.focus)?EN.focus:player;cam.x+=(ft.x-cam.x)*Math.min(1,dt*6);cam.z+=(ft.z-cam.z)*Math.min(1,dt*6);}
  updateLaser();updateFlash(dt);
  shake=Math.max(0,shake-dt*1.2);const sx=(Math.random()-.5)*shake,sz=(Math.random()-.5)*shake;
  camera.position.set(cam.x+sx,camH,cam.z+camH*.28+sz);camera.lookAt(cam.x+sx,0,cam.z+sz);
  sun.position.set(cam.x-6,22,cam.z+8);sun.target.position.set(cam.x,0,cam.z);
 }
 let last=performance.now();
-function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(state==='board'||state==='shop'){if(state==='board')updateBoard(dt);requestAnimationFrame(frame);return;}if(state==='ending')updateEnding(dt);if((state==='menu'||state==='intro')&&lobbyScene){updateLobby(dt);if(state==='intro')updateIntro(dt);lobbyCam.updateProjectionMatrix();renderer.render(lobbyScene,lobbyCam);requestAnimationFrame(frame);return;}update(dt);renderer.render(scene,camera);drawFog();requestAnimationFrame(frame);}
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(state==='board'||state==='shop'){if(state==='board')updateBoard(dt);requestAnimationFrame(frame);return;}if(state==='ending')updateEnding(dt);if(state==='cine')updateCine(dt);if((state==='menu'||state==='intro')&&lobbyScene){updateLobby(dt);if(state==='intro')updateIntro(dt);lobbyCam.updateProjectionMatrix();renderer.render(lobbyScene,lobbyCam);requestAnimationFrame(frame);return;}update(dt);renderer.render(scene,camera);drawFog();requestAnimationFrame(frame);}
 let curLevel='house';
 try{const s=localStorage.getItem('hotEntryLevel');if(LEVELS[s])curLevel=s;}catch(e){}
 function applyLevelUI(){
