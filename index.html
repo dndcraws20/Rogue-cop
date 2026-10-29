@@ -36,6 +36,9 @@ body{background:var(--ink);color:var(--fg);font-family:var(--mono);overflow:hidd
 #tdBtn{display:none;position:fixed;left:50%;top:60%;transform:translateX(-50%);pointer-events:auto;cursor:pointer;touch-action:manipulation;font-family:var(--display);font-weight:900;font-size:26px;letter-spacing:.12em;text-transform:uppercase;background:var(--amber);color:#101010;border:0;border-radius:3px;padding:12px 22px;box-shadow:0 6px 24px rgba(0,0,0,.55);white-space:nowrap}
 #tdBtn span{font-family:var(--mono);font-size:11px;font-weight:600;margin-left:12px;border:1px solid rgba(0,0,0,.45);border-radius:3px;padding:1px 6px;letter-spacing:0;vertical-align:middle}
 #tdBtn:hover{background:#ffd06b}#tdBtn:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+#pkBtn{display:none;position:fixed;left:50%;top:78%;transform:translateX(-50%);pointer-events:auto;cursor:pointer;touch-action:manipulation;font-family:var(--display);font-weight:900;font-size:26px;letter-spacing:.12em;text-transform:uppercase;background:var(--amber);color:#101010;border:0;border-radius:3px;padding:12px 22px;box-shadow:0 6px 24px rgba(0,0,0,.55);white-space:nowrap}
+#pkBtn span{font-family:var(--mono);font-size:11px;font-weight:600;margin-left:12px;border:1px solid rgba(0,0,0,.45);border-radius:3px;padding:1px 6px;letter-spacing:0;vertical-align:middle}
+#pkBtn:hover{background:#ffd06b}#pkBtn:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
 #swBtn{display:none;position:fixed;left:50%;top:70%;transform:translateX(-50%);pointer-events:auto;cursor:pointer;touch-action:manipulation;font-family:var(--display);font-weight:900;font-size:26px;letter-spacing:.12em;text-transform:uppercase;background:var(--amber);color:#101010;border:0;border-radius:3px;padding:12px 22px;box-shadow:0 6px 24px rgba(0,0,0,.55);white-space:nowrap}
 #swBtn span{font-family:var(--mono);font-size:11px;font-weight:600;margin-left:12px;border:1px solid rgba(0,0,0,.45);border-radius:3px;padding:1px 6px;letter-spacing:0;vertical-align:middle}
 #swBtn:hover{background:#ffd06b}#swBtn:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
@@ -162,6 +165,7 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
 <div id="hud" hidden>
   <button id="tdBtn" type="button">Stealth takedown<span>E</span></button>
   <button id="swBtn" type="button">Swap weapon<span>Q</span></button>
+  <button id="pkBtn" type="button">Look under door<span>G</span></button>
   <div class="col">
     <div class="chip" id="armChip" hidden><span class="lbl">Armor</span><div class="bar"><i id="armFill" style="background:var(--blue)"></i></div><b id="armNum">50</b></div>
     <div class="chip"><span class="lbl">Health</span><div class="bar"><i id="hpFill"></i></div><b id="hpNum">100</b></div>
@@ -1176,7 +1180,7 @@ function reset(){
  enemies.forEach((e,i)=>{const d=L.enemyDefs[i];Object.assign(e,{x:d[0],z:d[1],h:d[2],hp:100,state:'idle',walking:false,wait:Math.random()*2+.5,chat:0,visit:null,shout:0,susT:0,look:0,arrived:false,joinT:0,faceT:0,iconT:0,burst:0,exec:false,fight:false,guard:false,dodgeT:0,cool:0,stun:0,flash:0,fall:0,path:null,target:null,lost:0,react:0});e.mesh.rotation.z=0;e.mesh.rotation.x=0;e.grabbed=false;e.found=false;setState(e,'idle');setFlash(e.mesh,false);setPose(e);});
  hostages.forEach((h,i)=>{const d=L.hostageDefs[i];h.free=false;h.x=d[0];h.z=d[1];h.ring.material.color.setHex(0xffbf3c);setPose(h);h.mesh.position.y=-.12;});
  bullets.forEach(b=>scene.remove(b.m));bullets.length=0;resetDoors();killed=0;playTime=0;cutting=null;cutProg=0;timeLeft=L.timeLimit;
- player.spare=spareMax();player.wstock={};resetHostages();resetCops();pickFightEnemies();
+ player.spare=spareMax();player.wstock={};PEEK.on=false;PEEK.dx=0;PEEK.dz=0;peekTouch=false;resetHostages();resetCops();pickFightEnemies();
  cam.x=player.x;cam.z=player.z;
 }
 function scaleEnemies(){
@@ -2271,6 +2275,39 @@ function updateCine(dt){
  const f=C.ph<=1?e:C.ph===2?{x:(e.x+h.x)/2,z:(e.z+h.z)/2}:h;EN.focus={x:f.x,z:f.z};
 }
 
+/* ---------- look under a door (hold G / Peek button) ---------- */
+let PEEK={on:false,dx:0,dz:0,x:0,z:0,a:0,t:0,hint:false},peekTouch=false;
+function doorPeek(){
+ let best=null,bd=9;
+ for(const k in doors){const d=doors[k];if(d.open)continue;const dx=d.x+.5-player.x,dz=d.y+.5-player.z,dist=Math.hypot(dx,dz);if(dist>1.5)continue;
+  if((dx*Math.cos(player.h)+dz*Math.sin(player.h))/Math.max(dist,.01)<.35)continue;if(dist<bd){bd=dist;best=d;}}
+ if(!best)return null;
+ const dx=best.x+.5-player.x,dz=best.y+.5-player.z;let ux=0,uz=0;if(Math.abs(dx)>Math.abs(dz))ux=Math.sign(dx);else uz=Math.sign(dz);
+ const px=best.x+.5+ux*.62,pz=best.y+.5+uz*.62;if(tileSolid(Math.floor(px),Math.floor(pz)))return null;
+ return {d:best,ux,uz,px,pz};
+}
+function updatePeek(dt){
+ const held=(keys.KeyG||peekTouch)&&!tk&&!cutting&&state==='play',p=held?doorPeek():null;
+ if(!p){PEEK.on=false;PEEK.t=0;return;}
+ if(!PEEK.on){PEEK.on=true;PEEK.t=0;toast('Looking under the door','#93a1ba');}
+ PEEK.dx=p.ux;PEEK.dz=p.uz;PEEK.x=p.px;PEEK.z=p.pz;PEEK.a=Math.atan2(p.uz,p.ux);PEEK.t+=dt;
+ player.h=turnToward(player.h,PEEK.a,dt*10);player.vx=0;player.vz=0;
+ if(PEEK.t>2.6&&!PEEK.alerted){PEEK.alerted=true;for(const e of enemies){if(e.state!=='idle')continue;if(Math.hypot(e.x-p.px,e.z-p.pz)<2.2)goSus(e,player.x,player.z);}}
+ if(PEEK.t<.05)PEEK.alerted=false;
+}
+function peekSees(x,z){
+ if(!PEEK.on)return false;const dx=x-PEEK.x,dz=z-PEEK.z,d=Math.hypot(dx,dz);if(d>9)return false;
+ if(d>.4&&Math.abs(angDiff(Math.atan2(dz,dx),PEEK.a))>.62)return false;
+ return los(PEEK.x,PEEK.z,x,z);
+}
+function peekFog(){
+ if(!PEEK.on)return;
+ const c=toScreen(PEEK.x,.9,PEEK.z),c2=toScreen(PEEK.x+1,.9,PEEK.z),ppu=Math.hypot(c2[0]-c[0],c2[1]-c[1]);
+ const pts=[[PEEK.x,PEEK.z]],n=36;
+ for(let i=0;i<=n;i++){const a=PEEK.a-.62+1.24*i/n,d=castRay(PEEK.x,PEEK.z,a,9);pts.push([PEEK.x+Math.cos(a)*d,PEEK.z+Math.sin(a)*d]);}
+ cutPoly(pts,.8,9*ppu,.3,c[0],c[1]);
+}
+
 /* ---------- camera + faded vision overlay ---------- */
 const cam={x:8.5,z:19.5};let camH=17,vw=1,vh=1;
 const fogC=$('fog'),fctx=fogC.getContext('2d');let fw=1,fh=1;
@@ -2293,8 +2330,10 @@ function drawFog(){
  cutPoly(visPoly(player.h-1.25,player.h+1.25,13,44,true),.45,13*ppu,.3,c[0],c[1]);
  cutPoly(visPoly(player.h-.82,player.h+.82,13,56,true),.9,13*ppu,.3,c[0],c[1]);
  cutPoly(visPoly(0,Math.PI*2,2.6,40,false),.55,2.6*ppu,0,c[0],c[1]);
+ peekFog();
 }
 function canSee(x,z){
+ if(PEEK.on&&peekSees(x,z))return true;
  const dx=x-player.x,dz=z-player.z,d=Math.hypot(dx,dz);if(d>13)return false;
  if(d<2.4)return los(player.x,player.z,x,z);
  if(Math.abs(angDiff(Math.atan2(dz,dx),player.h))>.95)return false;
@@ -2387,6 +2426,7 @@ window.addEventListener('mouseup',()=>{mouseDown=false;});
 document.querySelectorAll('#touch button').forEach(b=>{const k=b.dataset.k;
  b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('on');setKey(k,true);});
  const up=()=>{b.classList.remove('on');setKey(k,false);};b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);});
+{const pk=$('pkBtn');pk.addEventListener('pointerdown',e=>{e.preventDefault();peekTouch=true;});['pointerup','pointercancel','pointerleave'].forEach(n=>pk.addEventListener(n,()=>{peekTouch=false;}));}
 $('swBtn').addEventListener('pointerdown',e=>{e.preventDefault();swapWeapon();});
 $('tdBtn').addEventListener('pointerdown',e=>{e.preventDefault();if(state==='play'&&!tk){const t=takedownTarget();if(t)startTakedown(t);}});
 $('startBtn').addEventListener('click',()=>{loadLevel(curLevel);fogC.style.display='block';startGame();});
@@ -2412,7 +2452,7 @@ function update(dt){
  if(state==='play'){
   playTime+=dt;timeLeft-=dt;
   if(timeLeft<=0){timeLeft=0;timeUp(dt);}
-  player.cool-=dt;
+  player.cool-=dt;updatePeek(dt);
   if(nearTrunk&&!tk&&player.sp<1.2&&player.hp<100)player.hp=Math.min(100,player.hp+7*dt);
   if(L.stairs.length&&!tk){player.stairCd-=dt;if(player.stairCd<=0)for(const st of L.stairs){
     const inA=player.x>=st.a.x&&player.x<st.a.x+st.a.w&&player.z>=st.a.y&&player.z<st.a.y+st.a.h,inB=player.x>=st.b.x&&player.x<st.b.x+st.b.w&&player.z>=st.b.y&&player.z<st.b.y+st.b.h;
@@ -2458,7 +2498,7 @@ function update(dt){
   if(tk)updateTakedown(dt);player.mesh.position.y=Math.abs(Math.sin(player.anim))*.04*Math.min(1,player.sp/3);
   if(pushing){const px=player.x+pushX*.6,pz=player.z+pushZ*.6,tx=Math.floor(px),tz=Math.floor(pz);
    if(tx>=0&&tz>=0&&tx<W&&tz<H&&grid[tz][tx]===3&&!doors[tz*W+tx].open){player.push+=dt;if(player.push>.3){openDoor(doors[tz*W+tx],player.x,player.z,false);player.push=0;}}else player.push=0;}else player.push=0;
-  if(!tk&&(keys.Space||mouseDown||autoFire)&&player.cool<=0&&player.reload<=0){if(player.ammo>0)shoot();else if(player.spare>0)startReload();else noAmmoHint();}
+  if(!tk&&!PEEK.on&&(keys.Space||mouseDown||autoFire)&&player.cool<=0&&player.reload<=0){if(player.ammo>0)shoot();else if(player.spare>0)startReload();else noAmmoHint();}
   if(cutting){const h=nearHostage();if(keys.KeyE&&h===cutting){cutProg+=dt/.9;$('cut').style.display='flex';$('cutFill').style.width=Math.min(100,cutProg*100)+'%';
     if(cutProg>=1){cutting.free=true;startEscape(cutting);player.hp=Math.min(100,player.hp+30);cutting.ring.material.color.setHex(0x5fe28c);cutting.mesh.position.y=0;cutting=null;cutProg=0;$('cut').style.display='none';noise(.05,.2,5000);
      const n=hostages.filter(x=>x.free).length;toast('Hostage secured '+n+'/'+hostages.length+'  +30 HP','#5fe28c');
@@ -2474,13 +2514,13 @@ function update(dt){
   $('hostages').textContent=hostages.filter(h=>h.free).length+' / '+hostages.length+(hDead?'  ✕'+hDead:'');
   $('hostiles').textContent=enemies.filter(e=>e.state!=='dead').length;
   $('stance').textContent=player.crouch?'Crouch':'Stand';
-  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(DR&&DR.alive&&Math.hypot(DR.x-player.x,DR.z-player.z)<2.4)txt='Kick the drill \u00b7 or shoot it';else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&(player.hp<100||player.spare<spareMax()))txt=player.sp<1.2?'Med kit and ammo restock'+(ownedWeapons().length>1?' · Q swap weapon':''):'Stand still to heal and restock';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';$('swBtn').style.display=(nearTrunk&&!tk&&ownedWeapons().length>1)?'block':'none';}
+  {const pr=$('prompt');let txt='',td=false;if(!tk){if(nearHostage())txt='Hold E · Cut ties (+30 HP)';else if(takedownTarget())td=true;else if(DR&&DR.alive&&Math.hypot(DR.x-player.x,DR.z-player.z)<2.4)txt='Kick the drill \u00b7 or shoot it';else if(doorPeek()&&!nearWindow())txt='Hold G \u00b7 look under the door \u00b7 E kick';else if(nearWindow())txt='Kick to smash the window \u00b7 or shoot it';else if(nearTrunk&&(player.hp<100||player.spare<spareMax()))txt=player.sp<1.2?'Med kit and ammo restock'+(ownedWeapons().length>1?' · Q swap weapon':''):'Stand still to heal and restock';}pr.textContent=txt;pr.style.display=txt?'block':'none';$('tdBtn').style.display=td?'block':'none';$('swBtn').style.display=(nearTrunk&&!tk&&ownedWeapons().length>1)?'block':'none';$('pkBtn').style.display=((touchOn()&&(PEEK.on||doorPeek()))&&!tk)?'block':'none';}
   $('clock').textContent=fmtT(timeLeft);$('rec').classList.toggle('low',timeLeft<60);
  }
  hostages.forEach(h=>{h.ring.position.set(h.x,.03,h.z);h.ring.scale.setScalar(1+Math.sin(time*4)*.08);h.mesh.rotation.y=-h.h;});
  enemies.forEach(e=>{if(state!=='play')return;e.mesh.visible=canSee(e.x,e.z);});
  hostages.forEach(h=>{const v=h.gone?false:(state!=='play'||canSee(h.x,h.z));h.mesh.visible=v;h.ring.visible=v&&!h.dead;});
- {const ft=((state==='ending'||state==='cine')&&EN.focus)?EN.focus:player;cam.x+=(ft.x-cam.x)*Math.min(1,dt*6);cam.z+=(ft.z-cam.z)*Math.min(1,dt*6);}
+ {const ft=((state==='ending'||state==='cine')&&EN.focus)?EN.focus:player,po=PEEK.on?1.8:0;cam.x+=(ft.x+PEEK.dx*po-cam.x)*Math.min(1,dt*6);cam.z+=(ft.z+PEEK.dz*po-cam.z)*Math.min(1,dt*6);}
  updateLaser();updateFlash(dt);
  shake=Math.max(0,shake-dt*1.2);const sx=(Math.random()-.5)*shake,sz=(Math.random()-.5)*shake;
  camera.position.set(cam.x+sx,camH,cam.z+camH*.28+sz);camera.lookAt(cam.x+sx,0,cam.z+sz);
