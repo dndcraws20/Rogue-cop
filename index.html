@@ -152,6 +152,8 @@ kbd{font-family:var(--mono);font-size:11px;color:var(--fg);border:1px solid var(
 .chip{background:linear-gradient(180deg,rgba(26,34,50,.92),rgba(14,19,29,.92));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06)}
 .bar{border-radius:4px;box-shadow:inset 0 1px 2px rgba(0,0,0,.5)}.bar i{border-radius:4px;box-shadow:0 0 8px currentColor;background-image:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,0))}
 #toast{text-shadow:0 2px 10px rgba(0,0,0,.8)}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:5px;border:1px solid rgba(255,255,255,.25);vertical-align:middle}
+.tones{display:flex;gap:6px}.tone{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}.tone.on{border-color:var(--green);box-shadow:0 0 0 2px rgba(95,226,140,.4)}
 </style>
 
 <div id="stage"></div>
@@ -774,7 +776,7 @@ function makePerson(o){
  box(.34,.55,.62,o.shirt,0,.9,0);
  if(o.vest)box(.4,.42,.66,o.vest,0,.94,0);
  box(.3,.3,.3,o.skin,0,1.38,0);
- if(o.hat==='cap'){box(.36,.1,.36,0x14213d,0,1.56,0);box(.16,.04,.3,0x0b0b0b,.2,1.52,0);box(.1,.02,.1,0xffc23d,.02,1.62,0);box(.1,.02,.14,0xffc23d,0,1.18,.3);box(.1,.02,.14,0xffc23d,0,1.18,-.3);}
+ if(o.hat==='cap'){box(.36,.1,.36,o.capc||0x14213d,0,1.56,0);box(.16,.04,.3,0x0b0b0b,.2,1.52,0);box(.1,.02,.1,0xffc23d,.02,1.62,0);box(.1,.02,.14,0xffc23d,0,1.18,.3);box(.1,.02,.14,0xffc23d,0,1.18,-.3);}
  else if(o.hat==='hood'){box(.38,.34,.38,0x26262c,-.02,1.42,0);box(.06,.15,.3,0xd0312d,.17,1.32,0);}
  else{box(.32,.1,.32,o.hair||0x3a2a1a,0,1.56,0);}
  if(o.armed){
@@ -1168,7 +1170,7 @@ function updateBullets(dt){
 
 /* ---------- game flow ---------- */
 function reset(){
- resetDrill();EN.saved=-1;EN.on=false;applyLoadout();hostages.forEach(h=>{h.gone=false;});tk=null;grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;player.mesh.scale.y=1;
+ resetDrill();EN.saved=-1;EN.on=false;if(player.look!==lookKey())applySkin();else applyLoadout();hostages.forEach(h=>{h.gone=false;});tk=null;grabArm.visible=false;knife.visible=false;player.mesh.rotation.z=0;player.mesh.scale.y=1;
  const sp=L.spawn;
  Object.assign(player,{crouch:false,cr:0,noiseLvl:0,stepT:0,stairCd:0,x:sp.x,z:sp.z,h:sp.h,hp:100,ammo:wpn().mag,mag:wpn().mag,armor:GEAR.armor>0?GEAR.armor:0,reload:0,cool:0,sp:0,vx:0,vz:0,push:0});
  enemies.forEach((e,i)=>{const d=L.enemyDefs[i];Object.assign(e,{x:d[0],z:d[1],h:d[2],hp:100,state:'idle',walking:false,wait:Math.random()*2+.5,chat:0,visit:null,shout:0,susT:0,look:0,arrived:false,joinT:0,faceT:0,iconT:0,burst:0,exec:false,fight:false,guard:false,dodgeT:0,cool:0,stun:0,flash:0,fall:0,path:null,target:null,lost:0,react:0});e.mesh.rotation.z=0;e.mesh.rotation.x=0;e.grabbed=false;e.found=false;setState(e,'idle');setFlash(e.mesh,false);setPose(e);});
@@ -1373,7 +1375,7 @@ function buildBridge(grp){
 
 // ---- the officer ----
 function makeLobbyCop(){
- const root=new THREE.Group(),navy=0x6a5a48,navyD=0x4f4132,skin=0xd9a27a;
+ const root=new THREE.Group(),oc=(OUTFITS[GEAR.outfit]||OUTFITS.patrol).coat,navy=oc,navyD=((oc>>16&255)*.75<<16)|((oc>>8&255)*.75<<8)|((oc&255)*.75|0),skin=TONES[GEAR.tone]||TONES[1];
  bx(root,.21,.84,.24,0x14213d,-.12,.46,0);bx(root,.21,.84,.24,0x14213d,.12,.46,0);
  bx(root,.23,.1,.34,0x0b0b0e,-.12,.05,-.04);bx(root,.23,.1,.34,0x0b0b0e,.12,.05,-.04);
  const body=new THREE.Group();body.position.set(0,.95,0);body.rotation.x=-.14;root.add(body);
@@ -1464,7 +1466,7 @@ function buildLobby(){
  const refl=new THREE.Group();buildCity(refl);refl.scale.y=-1;refl.position.y=2*LB_WY;sc.add(refl);
  // bridge + cop
  const bridge=new THREE.Group();buildBridge(bridge);sc.add(bridge);
- const cop=makeLobbyCop();cop.root.position.set(4,.17,-1.45);cop.root.rotation.y=.22;sc.add(cop.root);LB.cop=cop;
+ const cop=makeLobbyCop();cop.root.position.set(4,.17,-1.45);cop.root.rotation.y=.22;sc.add(cop.root);LB.cop=cop;LB.sc=sc;
  // smoke pool
  {const c=lbCanvas(64,64),x=c.getContext('2d'),g3=x.createRadialGradient(32,32,2,32,32,30);g3.addColorStop(0,'rgba(255,255,255,.6)');g3.addColorStop(.5,'rgba(235,232,240,.28)');g3.addColorStop(1,'rgba(235,232,240,0)');x.fillStyle=g3;x.fillRect(0,0,64,64);
   const tx=new THREE.CanvasTexture(c);
@@ -1516,6 +1518,11 @@ function updateLobby(dt){
   const f=p.age/p.life;p.vx+=dt*.05;p.vy*=1-dt*.12;
   p.s.position.x+=(p.vx+Math.sin(p.age*1.7+p.size*9)*.05)*dt;p.s.position.y+=p.vy*dt;p.s.position.z+=p.vz*dt;
   const sz=p.size*(1+p.grow*f);p.s.scale.set(sz,sz,1);p.s.material.opacity=p.op*Math.pow(1-f,1.4);}
+}
+
+function refreshLobbyCop(){
+ if(!LB.sc||!LB.cop)return;const old=LB.cop.root,vis=old.visible;LB.sc.remove(old);
+ const cop=makeLobbyCop();cop.root.position.copy(old.position);cop.root.rotation.copy(old.rotation);cop.root.visible=vis;LB.sc.add(cop.root);LB.cop=cop;
 }
 
 /* ---------- intro cutscene: detective driving through Chicago ---------- */
@@ -1775,14 +1782,23 @@ function finishEnding(){
 
 /* ---------- armory: weapons, attachments, armor ---------- */
 function ARMORS_OK(t){return t==='medium'||t==='heavy'?t:'light';}
-let GEAR={own:{},att:{},equip:'pistol',armor:-1,armorType:'light'};
+const OUTFITS={
+ patrol:{name:'Patrol blues',price:0,shirt:0x1d3557,vest:0x0e1626,pants:0x14213d,capc:0x14213d,hat:'cap',coat:0x6a5a48},
+ detective:{name:'Trench-coat detective',price:1500,shirt:0x8a6a45,vest:0x4a3a26,pants:0x2b2b30,hat:'none',hair:0x2a1d12,coat:0x8a6a45},
+ swat:{name:'Tactical black',price:3000,shirt:0x15171c,vest:0x2b3038,pants:0x101216,capc:0x0b0c0f,hat:'cap',coat:0x2b3038},
+ desert:{name:'Desert camo',price:4500,shirt:0x8a7a50,vest:0x5d5a3a,pants:0x6e6244,capc:0x5d5a3a,hat:'cap',coat:0x7a6a45},
+ arctic:{name:'Arctic ghost',price:6000,shirt:0xc9d1d9,vest:0x8d99a6,pants:0x9aa4ae,capc:0x6f7a86,hat:'cap',coat:0xb7c0ca},
+ crimson:{name:'Crimson squad',price:8000,shirt:0x5a1420,vest:0x2a0a10,pants:0x1a1a1f,capc:0x2a0a10,hat:'cap',coat:0x6a1c28},
+ gold:{name:'Chief gold',price:15000,shirt:0xd4a72c,vest:0x3a2d0b,pants:0x1f1f24,capc:0xf1c940,hat:'cap',coat:0xd4a72c}};
+const TONES=[0xf1c9a5,0xd9a27a,0xb27a52,0x8a5a3c,0x5a3a28];
+let GEAR={own:{},att:{},equip:'pistol',armor:-1,armorType:'light',outfit:'patrol',tone:1,ownO:{}};
 const ATT_IDS=['sil','laser','dmg','rate','mag'];
 const REPAIR_PER=40;
 const ARMORS={light:{name:'Light body armor',max:50,price:3000,slow:1,desc:'Soaks 50 damage. No slowdown.'},medium:{name:'Medium body armor',max:100,price:7500,slow:.965,desc:'Soaks 100 damage. Slows you down a very tiny bit.'},heavy:{name:'Heavy body armor',max:200,price:14000,slow:.86,desc:'Soaks 200 damage. Noticeably slower on your feet.'}};
 function armorMax(){return GEAR.armor<0?0:ARMORS[GEAR.armorType].max;}
 function armorSlow(){return (GEAR.armor>=0&&player.armor>0)?ARMORS[GEAR.armorType].slow:1;}
 try{const s=JSON.parse(localStorage.getItem('hotEntryGear'));if(s&&typeof s==='object'){
- GEAR={own:s.own||{},att:s.att||{},equip:s.equip||'pistol',armor:typeof s.armor==='number'?s.armor:-1,armorType:ARMORS_OK(s.armorType)};
+ GEAR={own:s.own||{},att:s.att||{},equip:s.equip||'pistol',armor:typeof s.armor==='number'?s.armor:-1,armorType:ARMORS_OK(s.armorType),outfit:OUTFITS[s.outfit]?s.outfit:'patrol',tone:(s.tone>=0&&s.tone<TONES.length)?s.tone|0:1,ownO:s.ownO||{}};
  if(!s.att){const eq=GEAR.equip,a={};for(const k of ATT_IDS)if(GEAR.own[k]){a[k]=1;delete GEAR.own[k];}GEAR.att[eq]=a;}
  if(GEAR.equip!=='pistol'&&!GEAR.own[GEAR.equip])GEAR.equip='pistol';}}catch(e){}
 function saveGear(){try{localStorage.setItem('hotEntryGear',JSON.stringify(GEAR));}catch(e){}}
@@ -1811,6 +1827,14 @@ function updateLaser(){
  if(len<.2){laserM.visible=false;return;}
  laserM.visible=true;laserM.scale.x=len;laserM.position.set(player.x+c*(.9+len/2),1.02,player.z+s*(.9+len/2));laserM.rotation.y=-player.h;
 }
+function lookKey(){return GEAR.outfit+'|'+GEAR.tone;}
+function applySkin(){
+ const o=OUTFITS[GEAR.outfit]||OUTFITS.patrol;
+ if(player.mesh)scene.remove(player.mesh);
+ player.mesh=makePerson({shirt:o.shirt,vest:o.vest,pants:o.pants,skin:TONES[GEAR.tone]||TONES[1],hat:o.hat,capc:o.capc,hair:o.hair,armed:true});
+ gunSMG=null;gunSG=null;player.look=lookKey();applyLoadout();setPose(player);
+ if(typeof refreshLobbyCop==='function')refreshLobbyCop();
+}
 function armorFixCost(){return GEAR.armor<0?0:Math.round((armorMax()-GEAR.armor)*REPAIR_PER);}
 function shopRow(title,desc,right){return '<div class="srow"><div class="sinfo"><b>'+title+'</b><span>'+desc+'</span></div>'+right+'</div>';}
 function renderShop(){
@@ -1821,6 +1845,10 @@ function renderShop(){
   h+=shopRow(b.name,d,owned?(on?'<button class="btn ghost sbtn" disabled>Equipped</button>':'<button class="btn sbtn" data-a="equip" data-id="'+id+'">Equip</button>'):'<button class="btn sbtn" data-a="buy" data-id="'+id+'"'+(CASH<WPN_PRICE[id]?' disabled':'')+'>'+money(WPN_PRICE[id])+'</button>');}
  h+='<h3>Attachments <small>fitted to your equipped weapon: '+wpn().name+'. Swap weapons at your cruiser in a mission.</small></h3>';
  for(const a of ATTACH)h+=shopRow(a.name,a.desc,attOf()[a.id]?'<button class="btn ghost sbtn" disabled>Fitted</button>':'<button class="btn sbtn" data-a="buy" data-id="'+a.id+'"'+(CASH<a.price?' disabled':'')+'>'+money(a.price)+'</button>');
+ h+='<h3>Wardrobe <small>cosmetic only</small></h3>';
+ for(const id in OUTFITS){const o=OUTFITS[id],owned=o.price===0||GEAR.ownO[id],on=GEAR.outfit===id;
+  h+=shopRow(o.name,'<span class="sw" style="background:#'+o.shirt.toString(16).padStart(6,'0')+'"></span><span class="sw" style="background:#'+o.vest.toString(16).padStart(6,'0')+'"></span><span class="sw" style="background:#'+o.pants.toString(16).padStart(6,'0')+'"></span>',owned?(on?'<button class="btn ghost sbtn" disabled>Wearing</button>':'<button class="btn sbtn" data-a="wear" data-id="'+id+'">Wear</button>'):'<button class="btn sbtn" data-a="buy" data-id="outfit-'+id+'"'+(CASH<o.price?' disabled':'')+'>'+money(o.price)+'</button>');}
+ h+=shopRow('Complexion','Pick your skin tone','<div class="tones">'+TONES.map((c,i)=>'<button type="button" class="tone'+(GEAR.tone===i?' on':'')+'" aria-label="Skin tone '+(i+1)+'" data-a="tone" data-id="'+i+'" style="background:#'+c.toString(16).padStart(6,'0')+'"></button>').join('')+'</div>');
  h+='<h3>Armor <small>one set at a time; buying another replaces it</small></h3>';
  for(const id of ['light','medium','heavy']){const A=ARMORS[id],mine=GEAR.armor>=0&&GEAR.armorType===id;
   if(mine){const c=armorFixCost();h+=shopRow(A.name,'Plates: '+Math.round(GEAR.armor)+' / '+A.max+(GEAR.armor<=0?' \u2014 BROKEN':'')+' \u00b7 '+A.desc,c?'<button class="btn sbtn" data-a="repair"'+(CASH<c?' disabled':'')+'>Repair '+money(c)+'</button>':'<button class="btn ghost sbtn" disabled>Intact</button>');}
@@ -1831,10 +1859,12 @@ function renderShop(){
 function shopMsg(t,col){const e=$('sToast');e.textContent=t;e.style.color=col||'';e.classList.remove('go');void e.offsetWidth;e.classList.add('go');}
 function shopAct(a,id){
  if(a==='equip'){GEAR.equip=id;saveGear();shopMsg(WPN[id].name+' equipped','#5fe28c');}
+ else if(a==='wear'){GEAR.outfit=id;saveGear();applySkin();shopMsg(OUTFITS[id].name+' on','#5fe28c');}
+ else if(a==='tone'){GEAR.tone=+id;saveGear();applySkin();shopMsg('Complexion changed','#5fe28c');}
  else if(a==='repair'){const c=armorFixCost();if(CASH<c)return;CASH-=c;GEAR.armor=armorMax();saveCash();saveGear();shopMsg('Armor repaired','#5fe28c');}
- else{let p=0;if(WPN_PRICE[id])p=WPN_PRICE[id];else if(id.indexOf('armor-')===0)p=ARMORS[id.slice(6)].price;else p=ATTACH.find(x=>x.id===id).price;
+ else{let p=0;if(id.indexOf('outfit-')===0)p=OUTFITS[id.slice(7)].price;else if(WPN_PRICE[id])p=WPN_PRICE[id];else if(id.indexOf('armor-')===0)p=ARMORS[id.slice(6)].price;else p=ATTACH.find(x=>x.id===id).price;
   if(CASH<p){shopMsg('Not enough cash','#ff4a3c');return;}
-  CASH-=p;if(id.indexOf('armor-')===0){GEAR.armorType=id.slice(6);GEAR.armor=ARMORS[GEAR.armorType].max;}else if(WPN_PRICE[id])GEAR.own[id]=1;else attOf()[id]=1;saveCash();saveGear();shopMsg('Purchased','#5fe28c');}
+  CASH-=p;if(id.indexOf('outfit-')===0){GEAR.ownO[id.slice(7)]=1;GEAR.outfit=id.slice(7);applySkin();}else if(id.indexOf('armor-')===0){GEAR.armorType=id.slice(6);GEAR.armor=ARMORS[GEAR.armorType].max;}else if(WPN_PRICE[id])GEAR.own[id]=1;else attOf()[id]=1;saveCash();saveGear();shopMsg('Purchased','#5fe28c');}
  renderShop();
 }
 function showShop(){state='shop';$('board').hidden=true;$('shop').hidden=false;renderShop();}
